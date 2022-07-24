@@ -16,27 +16,23 @@ export function createContext<T>(defaultValue: T): ReactContext<T> {
   // function. Warn to reserve for future use?
 
   const context: ReactContext<T> = {
+    // 这里的$$typeof也是和createRef一样,不属于组件的$$typeof而是组件的type内
     $$typeof: REACT_CONTEXT_TYPE,
-    // As a workaround to support multiple concurrent renderers, we categorize
-    // some renderers as primary and others as secondary. We only expect
-    // there to be two concurrent renderers at most: React Native (primary) and
-    // Fabric (secondary); React DOM (primary) and React ART (secondary).
-    // Secondary renderers store their context values on separate fields.
+    // _currentValue和_currentValue2是一样的效果,只不过是不同平台
+    // _currentValue是用来记录值发生变化 
     _currentValue: defaultValue,
     _currentValue2: defaultValue,
-    // Used to track how many concurrent renderers this context currently
-    // supports within in a single renderer. Such as parallel server rendering.
     _threadCount: 0,
     // These are circular
     Provider: (null: any),
     Consumer: (null: any),
 
-    // Add these to use same hidden class in VM as ServerContext
     _defaultValue: (null: any),
     _globalName: (null: any),
   };
 
   context.Provider = {
+    // 这里的$$typeof也是和createRef一样,不属于组件的$$typeof而是组件的type内
     $$typeof: REACT_PROVIDER_TYPE,
     _context: context,
   };
@@ -125,6 +121,8 @@ export function createContext<T>(defaultValue: T): ReactContext<T> {
     // $FlowFixMe: Flow complains about missing properties because it doesn't understand defineProperty
     context.Consumer = Consumer;
   } else {
+    // context.Consumer = context
+    // 因为consumer指向自己,那么当context需要拿最新的值的时候,只需要从自身的consumer上找_currentValue就可以了
     context.Consumer = context;
   }
 
