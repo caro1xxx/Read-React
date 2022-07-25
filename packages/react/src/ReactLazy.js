@@ -122,13 +122,18 @@ export function lazy<T>(
   ctor: () => Thenable<{default: T, ...}>,
 ): LazyComponent<T, Payload<T>> {
   const payload: Payload<T> = {
-    // We use these fields to store the result.
+
+    // 记录当前thenable处于的状态
     _status: Uninitialized,
+    // 记录thenable返回的结果
     _result: ctor,
   };
 
+  
   const lazyType: LazyComponent<T, Payload<T>> = {
+    // 这里的$$typeof属性也是在type之下的
     $$typeof: REACT_LAZY_TYPE,
+    // 最后将payload放入lazyType
     _payload: payload,
     _init: lazyInitializer,
   };

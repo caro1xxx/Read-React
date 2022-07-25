@@ -74,13 +74,16 @@ function getElementKey(element: any, index: number): string {
   return index.toString(36);
 }
 
+// mapIntoArray一共有两层递归
 function mapIntoArray(
-  children: ?ReactNodeList,
-  array: Array<React$Node>,
-  escapedPrefix: string,
-  nameSoFar: string,
-  callback: (?React$Node) => ?ReactNodeList,
+  children: ?ReactNodeList, //children
+  array: Array<React$Node>, //[]
+  escapedPrefix: string, //''
+  nameSoFar: string, //''
+  callback: (?React$Node) => ?ReactNodeList,//fn
 ): number {
+
+  //children的类型
   const type = typeof children;
 
   if (type === 'undefined' || type === 'boolean') {
@@ -119,6 +122,7 @@ function mapIntoArray(
       if (childKey != null) {
         escapedChildKey = escapeUserProvidedKey(childKey) + '/';
       }
+      //mapIntoArray 大递归
       mapIntoArray(mappedChild, array, escapedChildKey, '', c => c);
     } else if (mappedChild != null) {
       if (isValidElement(mappedChild)) {
@@ -159,6 +163,9 @@ function mapIntoArray(
     for (let i = 0; i < children.length; i++) {
       child = children[i];
       nextName = nextNamePrefix + getElementKey(child, i);
+      //mapIntoArray 小递归
+      // subtreeCount最后就是要return的结果,这里逐一将mapIntoArray结果返回给subtreeCount
+      // 因为mapIntoArray会返回1所以subtreeCount最后就是节点的数量
       subtreeCount += mapIntoArray(
         child,
         array,
@@ -168,6 +175,8 @@ function mapIntoArray(
       );
     }
   } else {
+    // getIteratorFn()作用:
+    // 如果children是一个function,那么getIteratorFn会将children构造为一个可迭代对象并返回
     const iteratorFn = getIteratorFn(children);
     if (typeof iteratorFn === 'function') {
       const iterableChildren: Iterable<React$Node> & {

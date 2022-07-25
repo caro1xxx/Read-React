@@ -24,6 +24,7 @@ import {
 
 import {Component, PureComponent} from './ReactBaseClasses';
 import {createRef} from './ReactCreateRef';
+//   这里的map就是mapChildren
 import {forEach, map, count, toArray, only} from './ReactChildren';
 import {
   createElement as createElementProd,
@@ -91,8 +92,9 @@ export {
   PureComponent,
   createContext,
   createServerContext,
-  // 让HOC组件能够拿到下一层的ref
+  // forwardRef作用:让HOC组件能够拿到下一层的ref
   forwardRef,
+  // lazy
   lazy,
   memo,
   useCallback,
@@ -112,6 +114,7 @@ export {
   REACT_PROFILER_TYPE as Profiler,
   REACT_STRICT_MODE_TYPE as StrictMode,
   REACT_DEBUG_TRACING_MODE_TYPE as unstable_DebugTracingMode,
+  // suspence  是一个ReactSymbol
   REACT_SUSPENSE_TYPE as Suspense,
   //***创建组件***
   createElement,
