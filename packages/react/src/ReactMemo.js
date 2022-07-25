@@ -9,6 +9,7 @@ import {REACT_MEMO_TYPE} from 'shared/ReactSymbols';
 
 import isValidElementType from 'shared/isValidElementType';
 
+// 提供与pruecomponent类似的功能
 export function memo<Props>(
   type: React$ElementType,
   compare?: (oldProps: Props, newProps: Props) => boolean,
@@ -23,6 +24,7 @@ export function memo<Props>(
     }
   }
   const elementType = {
+    // 组件下的type内的$$typeof属性
     $$typeof: REACT_MEMO_TYPE,
     type,
     compare: compare === undefined ? null : compare,

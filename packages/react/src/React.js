@@ -110,19 +110,26 @@ export {
   useReducer,
   useRef,
   useState,
+  // Fragment
+  // Symbol.for('react.fragment');
   REACT_FRAGMENT_TYPE as Fragment,
   REACT_PROFILER_TYPE as Profiler,
+  // StrictMode
+  // Symbol.for('react.strict_mode');
+  // 作用:对即将过期了的Api进行提醒
   REACT_STRICT_MODE_TYPE as StrictMode,
   REACT_DEBUG_TRACING_MODE_TYPE as unstable_DebugTracingMode,
   // suspence  是一个ReactSymbol
   REACT_SUSPENSE_TYPE as Suspense,
-  //***创建组件***
+  //**创建组件**
   createElement,
+  // cloneElement
   cloneElement,
   isValidElement,
   ReactVersion as version,
   ReactSharedInternals as __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED,
-  // Deprecated behind disableCreateFactory
+  // createFactory
+  // 对createElement()的一个封装
   createFactory,
   // Concurrent Mode
   useTransition,
