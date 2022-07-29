@@ -506,6 +506,12 @@ export function getWorkInProgressRootRenderLanes(): Lanes {
 }
 
 export function requestEventTime() {
+  // 判断有哪个权限
+  // executionContext 1表示有,0表示无
+  // RenderContext 1表示有,0表示无
+  // CommitContext 1表示有,0表示无
+  // 使用 | 来赋值添加权限
+  // 使用 & 来判断权限
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
     // We're inside React, so it's fine to read the actual time.
     return now();
@@ -525,7 +531,7 @@ export function getCurrentTime() {
 }
 
 export function requestUpdateLane(fiber: Fiber): Lane {
-  // Special cases
+  // 获取到当前渲染的模式：sync mode（同步模式） 或 concurrent mode（并发模式）
   const mode = fiber.mode;
   if ((mode & ConcurrentMode) === NoMode) {
     return (SyncLane: Lane);

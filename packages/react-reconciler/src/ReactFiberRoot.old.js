@@ -51,18 +51,18 @@ function FiberRootNode(
   onRecoverableError,
 ) {
   this.tag = tag;
-  this.containerInfo = containerInfo;
+  this.containerInfo = containerInfo; //root节点,render方法接收的第二个参数
   this.pendingChildren = null;
-  this.current = null;
+  this.current = null; //当前应用对应的fiber对象,是root fiber,是整个fiber树的顶点
   this.pingCache = null;
-  this.finishedWork = null;
-  this.timeoutHandle = noTimeout;
-  this.context = null;
+  this.finishedWork = null; //在一次更新过程中,完成了的那个任务
+  this.timeoutHandle = noTimeout; //帮助suspence记录超时情况
+  this.context = null; //只有主动调用`renderSubtreeIntoContainer`时才会有用
   this.pendingContext = null;
   this.callbackNode = null;
   this.callbackPriority = NoLane;
   this.eventTimes = createLaneMap(NoLanes);
-  this.expirationTimes = createLaneMap(NoTimestamp);
+  this.expirationTimes = createLaneMap(NoTimestamp);//当前更新对应的过期时间
 
   this.pendingLanes = NoLanes; //pending
   this.suspendedLanes = NoLanes; //异步组件
@@ -129,7 +129,7 @@ function FiberRootNode(
 }
 
 export function createFiberRoot(
-  containerInfo: any,
+  containerInfo: any, 
   tag: RootTag,
   hydrate: boolean,
   initialChildren: ReactNodeList,

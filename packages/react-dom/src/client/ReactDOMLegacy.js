@@ -113,7 +113,7 @@ function legacyCreateRootFromDOMContainer(
   initialChildren: ReactNodeList, //初始子节点
   parentComponent: ?React$Component<any, any>, //父组件
   callback: ?Function,
-  isHydrationContainer: boolean,
+  isHydrationContainer: boolean, //forceHydrate   false
 ): FiberRoot {
   if (isHydrationContainer) {
     if (typeof callback === 'function') {
@@ -350,11 +350,12 @@ export function render(
       );
     }
   }
+
   return legacyRenderSubtreeIntoContainer(
-    null,
+    null, 
     element,
     container,
-    false,
+    false, 
     callback,
   );
 }

@@ -459,7 +459,7 @@ describe('Timeline profiler', () => {
                   "batchUID": 0,
                   "depth": 0,
                   "duration": 0.005,
-                  "lanes": "0b0000000000000000000000000001001",
+                  "lanes": "0b0000000000000000001",
                   "timestamp": 0.006,
                   "type": "render-idle",
                 },

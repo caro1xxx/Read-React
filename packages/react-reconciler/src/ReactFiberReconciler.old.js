@@ -244,11 +244,11 @@ function findHostInstanceWithWarning(
   return findHostInstance(component);
 }
 
-export function createContainer(
+export function  createContainer(
   containerInfo: Container,
   tag: RootTag,
   hydrationCallbacks: null | SuspenseHydrationCallbacks,
-  isStrictMode: boolean,
+  isStrictMode: boolean, 
   concurrentUpdatesByDefaultOverride: null | boolean,
   identifierPrefix: string,
   onRecoverableError: (error: mixed) => void,
@@ -328,7 +328,9 @@ export function updateContainer(
     onScheduleRoot(container, element);
   }
   const current = container.current;
+  // currentEventTime = now();
   const eventTime = requestEventTime();
+  // DiscreteEventPriority 离散事件
   const lane = requestUpdateLane(current);
 
   if (enableSchedulingProfiler) {

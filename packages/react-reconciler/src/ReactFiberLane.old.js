@@ -31,19 +31,29 @@ import {clz32} from './clz32';
 // Lane values below should be kept in sync with getLabelForLane(), used by react-devtools-timeline.
 // If those values are changed that package should be rebuilt and redeployed.
 
+// 数值越小优先级越高
+// 一个lanes可能会包括多个lane
+// 可以想象成lanes是车道组,lane是附属于车道组 的车道
+// 数值越小的车道就相当于是越往内圈的车道
 export const TotalLanes = 31;
 
+// 一类
+// 最高事件
 export const NoLanes: Lanes = /*                        */ 0b0000000000000000000000000000000;
 export const NoLane: Lane = /*                          */ 0b0000000000000000000000000000000;
-
+// 二类
+// 同步事件
 export const SyncLane: Lane = /*                        */ 0b0000000000000000000000000000001;
-
+// 三类
+// 输入事件
 export const InputContinuousHydrationLane: Lane = /*    */ 0b0000000000000000000000000000010;
 export const InputContinuousLane: Lane = /*             */ 0b0000000000000000000000000000100;
-
+// 四类
+// 默认事件
 export const DefaultHydrationLane: Lane = /*            */ 0b0000000000000000000000000001000;
 export const DefaultLane: Lane = /*                     */ 0b0000000000000000000000000010000;
-
+// 五类
+// 过度事件
 const TransitionHydrationLane: Lane = /*                */ 0b0000000000000000000000000100000;
 const TransitionLanes: Lanes = /*                       */ 0b0000000001111111111111111000000;
 const TransitionLane1: Lane = /*                        */ 0b0000000000000000000000001000000;
@@ -62,7 +72,8 @@ const TransitionLane13: Lane = /*                       */ 0b0000000000001000000
 const TransitionLane14: Lane = /*                       */ 0b0000000000010000000000000000000;
 const TransitionLane15: Lane = /*                       */ 0b0000000000100000000000000000000;
 const TransitionLane16: Lane = /*                       */ 0b0000000001000000000000000000000;
-
+// 六类
+// 重试事件
 const RetryLanes: Lanes = /*                            */ 0b0000111110000000000000000000000;
 const RetryLane1: Lane = /*                             */ 0b0000000010000000000000000000000;
 const RetryLane2: Lane = /*                             */ 0b0000000100000000000000000000000;
@@ -79,10 +90,13 @@ const NonIdleLanes: Lanes = /*                          */ 0b0001111111111111111
 export const IdleHydrationLane: Lane = /*               */ 0b0010000000000000000000000000000;
 export const IdleLane: Lane = /*                        */ 0b0100000000000000000000000000000;
 
+// 幕后工作事件
 export const OffscreenLane: Lane = /*                   */ 0b1000000000000000000000000000000;
 
 // This function is used for the experimental timeline (react-devtools-timeline)
 // It should be kept in sync with the Lanes values above.
+
+// 获取车道的标签
 export function getLabelForLane(lane: Lane): string | void {
   if (enableSchedulingProfiler) {
     if (lane & SyncLane) {
@@ -126,10 +140,12 @@ export function getLabelForLane(lane: Lane): string | void {
 
 export const NoTimestamp = -1;
 
+
 let nextTransitionLane: Lane = TransitionLane1;
 let nextRetryLane: Lane = RetryLane1;
-
+// 获取最高优先级lanes
 function getHighestPriorityLanes(lanes: Lanes | Lane): Lanes {
+        // // 获取最高优先级lane
   switch (getHighestPriorityLane(lanes)) {
     case SyncLane:
       return SyncLane;
@@ -325,6 +341,7 @@ export function getMostRecentEventTime(root: FiberRoot, lanes: Lanes): number {
   return mostRecentEventTime;
 }
 
+// 计算过期时间
 function computeExpirationTime(lane: Lane, currentTime: number) {
   switch (lane) {
     case SyncLane:

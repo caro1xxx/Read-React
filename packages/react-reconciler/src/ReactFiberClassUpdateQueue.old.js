@@ -212,11 +212,15 @@ export function createUpdate(eventTime: number, lane: Lane): Update<*> {
     eventTime,
     lane,
 
+    // export const UpdateState = 0;
+    // export const ReplaceState = 1;
+    // export const ForceUpdate = 2;
+    // export const CaptureUpdate = 3;
     tag: UpdateState,
     payload: null,
     callback: null,
 
-    next: null,
+    next: null, //指向updateQueue中的下一个update
   };
   return update;
 }
