@@ -325,8 +325,8 @@ export function listenToNonDelegatedEvent(
 
 export function listenToNativeEvent(
   domEventName: DOMEventName,
-  isCapturePhaseListener: boolean,
-  target: EventTarget,
+  isCapturePhaseListener: boolean, //false
+  target: EventTarget, //根容器节点
 ): void {
   if (__DEV__) {
     if (nonDelegatedEvents.has(domEventName) && !isCapturePhaseListener) {
@@ -339,9 +339,12 @@ export function listenToNativeEvent(
   }
 
   let eventSystemFlags = 0;
+  // 判断是否是监听捕获阶段
   if (isCapturePhaseListener) {
+    // 是的话,打上标记
     eventSystemFlags |= IS_CAPTURE_PHASE;
   }
+  // 将事件绑定到根节点上
   addTrappedEventListener(
     target,
     domEventName,
@@ -384,8 +387,11 @@ const listeningMarker =
     .slice(2);
 
 export function listenToAllSupportedEvents(rootContainerElement: EventTarget) {
+  // 判断rootContainerElement身上是否有listeningMarker属性
   if (!(rootContainerElement: any)[listeningMarker]) {
+    // 如果没有,则添加为ture
     (rootContainerElement: any)[listeningMarker] = true;
+    // allNativeEvents:获取所有原生事件
     allNativeEvents.forEach(domEventName => {
       // We handle selectionchange separately because it
       // doesn't bubble and needs to be on the document.
@@ -412,12 +418,14 @@ export function listenToAllSupportedEvents(rootContainerElement: EventTarget) {
 }
 
 function addTrappedEventListener(
-  targetContainer: EventTarget,
+  targetContainer: EventTarget, //根容器节点
   domEventName: DOMEventName,
-  eventSystemFlags: EventSystemFlags,
-  isCapturePhaseListener: boolean,
+  eventSystemFlags: EventSystemFlags, //事件flag
+  isCapturePhaseListener: boolean, //false
   isDeferredListenerForLegacyFBSupport?: boolean,
 ) {
+  // createEventListenerWrapperWithPriority()优先创建事件监听器包装器
+  //返回:一个事件方法bind调用后的值
   let listener = createEventListenerWrapperWithPriority(
     targetContainer,
     domEventName,
@@ -433,6 +441,10 @@ function addTrappedEventListener(
     // the performance wins from the change. So we emulate
     // the existing behavior manually on the roots now.
     // https://github.com/facebook/react/issues/19651
+    /**
+     * 这里进行对一个特殊事件的判断,因为浏览器的干预,
+     * 所以需要对touchstart|touchmove|wheel事件进行单独处理
+     */
     if (
       domEventName === 'touchstart' ||
       domEventName === 'touchmove' ||
@@ -442,7 +454,14 @@ function addTrappedEventListener(
     }
   }
 
+  // 不变
   targetContainer =
+  /**
+   * enableLegacyFBSupport:false
+    初次调用addTrappedEventListener时没有传递isDeferredListenerForLegacyFBSupport的值,所以是null
+    条件不成立,targetContainer还是targetContainer
+    如果启用了传统FB那么targetContainer就是targetContainer.ownerDocument了
+   */
     enableLegacyFBSupport && isDeferredListenerForLegacyFBSupport
       ? (targetContainer: any).ownerDocument
       : targetContainer;

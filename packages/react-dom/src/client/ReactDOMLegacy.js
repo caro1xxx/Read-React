@@ -110,8 +110,8 @@ function noopOnRecoverableError() {
 
 function legacyCreateRootFromDOMContainer(
   container: Container, //dom
-  initialChildren: ReactNodeList, //初始子节点
-  parentComponent: ?React$Component<any, any>, //父组件
+  initialChildren: ReactNodeList, //App
+  parentComponent: ?React$Component<any, any>, //父组件 null
   callback: ?Function,
   isHydrationContainer: boolean, //forceHydrate   false
 ): FiberRoot {
@@ -156,6 +156,7 @@ function legacyCreateRootFromDOMContainer(
       container.removeChild(rootSibling);
     }
 
+    // 获取root实例后,对root执行callback
     if (typeof callback === 'function') {
       const originalCallback = callback;
       callback = function() {
@@ -164,6 +165,7 @@ function legacyCreateRootFromDOMContainer(
       };
     }
 
+    // 创建容器对象
     const root = createContainer(
       container,
       LegacyRoot,
@@ -174,14 +176,19 @@ function legacyCreateRootFromDOMContainer(
       noopOnRecoverableError, // onRecoverableError
       null, // transitionCallbacks
     );
-    container._reactRootContainer = root;
+
+    // 添加属性
+    container._reactRootContainer = root; //此时maybeRoot才会有值
     markContainerAsRoot(root.current, container);
 
+    // container
     const rootContainerElement =
       container.nodeType === COMMENT_NODE ? container.parentNode : container;
+    // 事件委托处理
     listenToAllSupportedEvents(rootContainerElement);
 
-    // Initial mount should not be batched.
+    // 初始化不应该批量挂载
+    // 返回的结果要么是undefined | updateContainer()的结果
     flushSync(() => {
       updateContainer(initialChildren, root, parentComponent, callback);
     });
@@ -206,9 +213,9 @@ function warnOnInvalidCallback(callback: mixed, callerName: string): void {
 function legacyRenderSubtreeIntoContainer(
   parentComponent: ?React$Component<any, any>, //null
   children: ReactNodeList, //App
-  container: Container, //dom
-  forceHydrate: boolean, //服务器渲染相关
-  callback: ?Function,
+  container: Container, //容器
+  forceHydrate: boolean, //服务器渲染相关 false
+  callback: ?Function, //回调
 ) {
   if (__DEV__) {
     topLevelUpdateWarnings(container);
@@ -217,16 +224,23 @@ function legacyRenderSubtreeIntoContainer(
 
   const maybeRoot = container._reactRootContainer;
   let root: FiberRoot;
+  // _reactRootContainer如果不存在
   if (!maybeRoot) {
-    // 初始化
+    /**
+     * 初始化,
+     * _reactRootContainer一定不存在,因为初始化的时候没有这个属性
+     * 所以从DOM容器创建root
+     */
     root = legacyCreateRootFromDOMContainer(
       container, //dom
-      children,
-      parentComponent,
+      children, //App
+      parentComponent, //null
       callback,
-      forceHydrate,
+      forceHydrate, //false
     );
   } else {
+    // 在已经初始化完成后,后续的maybeRoot一定会有_reactRootContainer属性
+    //存在的情况,说明已经初始化过了
     root = maybeRoot;
     if (typeof callback === 'function') {
       const originalCallback = callback;
@@ -351,6 +365,7 @@ export function render(
     }
   }
 
+  // 渲染子树到容器
   return legacyRenderSubtreeIntoContainer(
     null, 
     element,

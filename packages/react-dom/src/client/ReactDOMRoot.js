@@ -74,7 +74,7 @@ import {
   disableCommentsAsDOMContainers,
 } from 'shared/ReactFeatureFlags';
 
-/* global reportError */
+// 全局错误报告
 const defaultOnRecoverableError =
   typeof reportError === 'function'
     ? // In modern browsers, reportError will dispatch an error event,
@@ -86,6 +86,10 @@ const defaultOnRecoverableError =
         console['error'](error);
       };
 
+/**
+ * 返回一个ReactDOMRott对象,
+ * 该对象的_internalRoot属性指向FiberRoot
+ */
 function ReactDOMRoot(internalRoot: FiberRoot) {
   this._internalRoot = internalRoot;
 }
@@ -168,12 +172,14 @@ export function createRoot(
   container: Element | Document | DocumentFragment,
   options?: CreateRootOptions,
 ): RootType {
+  // 判断是否是有效容器
   if (!isValidContainer(container)) {
     throw new Error('createRoot(...): Target container is not a DOM element.');
   }
 
   warnIfReactDOMContainerInDEV(container);
 
+  
   let isStrictMode = false;
   let concurrentUpdatesByDefaultOverride = false;
   let identifierPrefix = '';
@@ -222,24 +228,36 @@ export function createRoot(
     }
   }
 
+  // 创建容器对象
+  // 最终返回的是具有current:FiberHostRoot的FiberRoot对象
   const root = createContainer(
-    container,
-    ConcurrentRoot,
+    container, //Element | Document | DocumentFragment,
+    ConcurrentRoot, //export const ConcurrentRoot = 1;
     null,
-    isStrictMode,
-    concurrentUpdatesByDefaultOverride,
-    identifierPrefix,
-    onRecoverableError,
-    transitionCallbacks,
+    isStrictMode, //false
+    concurrentUpdatesByDefaultOverride, //false
+    identifierPrefix, //'';
+    onRecoverableError, //全局错误报告函数
+    transitionCallbacks, //null
   );
+  /**
+   * 传入的root.current就是在createContainer内部创建的FiberHostRoot对象
+   * 
+   * markContainerAsRoot在当前container身上添加一个internalContainerInstanceKey属性
+   * 值为root.current
+   */
   markContainerAsRoot(root.current, container);
 
+  // rootContainerElement: container
   const rootContainerElement: Document | Element | DocumentFragment =
     container.nodeType === COMMENT_NODE
       ? (container.parentNode: any)
       : container;
+  
+  // 事件委托处理
   listenToAllSupportedEvents(rootContainerElement);
 
+  // 返回ReactDomRoot对象,该对象的_internalRoot属性指向FiberRoot
   return new ReactDOMRoot(root);
 }
 

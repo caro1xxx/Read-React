@@ -84,24 +84,30 @@ export function createEventListenerWrapper(
 }
 
 export function createEventListenerWrapperWithPriority(
-  targetContainer: EventTarget,
+  targetContainer: EventTarget, //根容器节点
   domEventName: DOMEventName,
-  eventSystemFlags: EventSystemFlags,
+  eventSystemFlags: EventSystemFlags, //事件flag
 ): Function {
+  // 获取事件优先级
   const eventPriority = getEventPriority(domEventName);
   let listenerWrapper;
+  // 根据事件优先级给事件分类
   switch (eventPriority) {
+    // 离散事件
     case DiscreteEventPriority:
       listenerWrapper = dispatchDiscreteEvent;
       break;
+    //连续事件
     case ContinuousEventPriority:
       listenerWrapper = dispatchContinuousEvent;
       break;
+    //默认事件
     case DefaultEventPriority:
     default:
       listenerWrapper = dispatchEvent;
       break;
   }
+  // 这里就是将事件进行分类后,bind调用listenerWrapper对象的方法
   return listenerWrapper.bind(
     null,
     domEventName,

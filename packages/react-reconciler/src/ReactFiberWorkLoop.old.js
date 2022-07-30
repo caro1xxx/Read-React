@@ -612,10 +612,10 @@ function requestRetryLane(fiber: Fiber) {
 }
 
 export function scheduleUpdateOnFiber(
-  root: FiberRoot,
-  fiber: Fiber,
-  lane: Lane,
-  eventTime: number,
+  root: FiberRoot, //root
+  fiber: Fiber, //FiberHostRoot对象
+  lane: Lane, //lane
+  eventTime: number, //now();
 ) {
   if (__DEV__) {
     if (isRunningInsertionEffect) {
@@ -632,6 +632,9 @@ export function scheduleUpdateOnFiber(
   // Mark that the root has a pending update.
   markRootUpdated(root, lane, eventTime);
 
+
+
+  //该判断是性能相关的
   if (
     (executionContext & RenderContext) !== NoLanes &&
     root === workInProgressRoot
@@ -657,8 +660,10 @@ export function scheduleUpdateOnFiber(
       }
     }
 
+    // 如果更新没有用Act DEV包装，报警告
     warnIfUpdatesNotWrappedWithActDEV(fiber);
 
+    //性能
     if (enableProfilerTimer && enableProfilerNestedUpdateScheduledHook) {
       if (
         (executionContext & CommitContext) !== NoContext &&
@@ -679,6 +684,7 @@ export function scheduleUpdateOnFiber(
       }
     }
 
+    // 性能
     if (enableTransitionTracing) {
       const transition = ReactCurrentBatchConfig.transition;
       if (transition !== null && transition.name != null) {
@@ -690,6 +696,7 @@ export function scheduleUpdateOnFiber(
       }
     }
 
+
     if (root === workInProgressRoot) {
       // Received an update to a tree that's in the middle of rendering. Mark
       // that there was an interleaved update work on this root. Unless the
@@ -697,14 +704,18 @@ export function scheduleUpdateOnFiber(
       // phase update. In that case, we don't treat render phase updates as if
       // they were interleaved, for backwards compat reasons.
       if (
+        // 将渲染阶段更新推迟到下一批
         deferRenderPhaseUpdateToNextBatch ||
+        // 判断权限
         (executionContext & RenderContext) === NoContext
       ) {
+        // mergeLanes:合并两条车道优先级
         workInProgressRootInterleavedUpdatedLanes = mergeLanes(
-          workInProgressRootInterleavedUpdatedLanes,
-          lane,
+          workInProgressRootInterleavedUpdatedLanes,// NoLanes
+          lane, //传入的lane
         );
       }
+      // 判断工作状态是否停止或暂停
       if (workInProgressRootExitStatus === RootSuspendedWithDelay) {
         // The root already suspended with a delay, which means this render
         // definitely won't finish. Since we have a new update, let's mark it as
@@ -712,6 +723,7 @@ export function scheduleUpdateOnFiber(
         // effect of interrupting the current render and switching to the update.
         // TODO: Make sure this doesn't override pings that happen while we've
         // already started rendering.
+        // 标记
         markRootSuspended(root, workInProgressRootRenderLanes);
       }
     }
@@ -775,16 +787,20 @@ export function isUnsafeClassRenderPhaseUpdate(fiber: Fiber) {
 function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   const existingCallbackNode = root.callbackNode;
 
-  // Check if any lanes are being starved by other work. If so, mark them as
-  // expired so we know to work on those next.
+  // 用于将已经被其他工作“饿死”的lane标记为已过期，后面会避免使用已过期的 lane
   markStarvedLanesAsExpired(root, currentTime);
 
-  // Determine the next lanes to work on, and their priority.
+  /**
+   * 调用getNextLanes获取下一个车道
+   * 如果没有下一个车道了,即调用结果是 NoLanes, 则退出
+   * 退出前执行 root.callbackNode = null和root.callbackPriority = NoLane
+   */
   const nextLanes = getNextLanes(
     root,
     root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
   );
 
+  // 执行NoLanes的情况
   if (nextLanes === NoLanes) {
     // Special case: There's nothing to work on.
     if (existingCallbackNode !== null) {
@@ -795,7 +811,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
     return;
   }
 
-  // We use the highest priority lane to represent the priority of the callback.
+  // 获取最高优先度的车道
   const newCallbackPriority = getHighestPriorityLane(nextLanes);
 
   // Check if there's an existing task. We may be able to reuse it.
@@ -828,6 +844,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
     return;
   }
 
+
   if (existingCallbackNode != null) {
     // Cancel the existing callback. We'll schedule a new one below.
     cancelCallback(existingCallbackNode);
@@ -835,6 +852,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 
   // Schedule a new callback.
   let newCallbackNode;
+  // 如果当前调度的任务是是一个 Scheduler 任务而不是一个“act”任务，则退出，重新调度“act”的队列
   if (newCallbackPriority === SyncLane) {
     // Special case: Sync React callbacks are scheduled on a special
     // internal queue
@@ -846,8 +864,10 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
     } else {
       scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
     }
+
+    // 是否支持微任务
     if (supportsMicrotasks) {
-      // Flush the queue in a microtask.
+      // 刷新微任务队列
       if (__DEV__ && ReactCurrentActQueue.current !== null) {
         // Inside `act`, use our internal `act` queue so that these get flushed
         // at the end of the current scope even when using the sync version
@@ -870,12 +890,14 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
         });
       }
     } else {
-      // Flush the queue in an Immediate task.
+      // 如果不支持微任务,那么使用cheduleCallback(ImmediateSchedulerPriority, flushSyncCallbacks);
       scheduleCallback(ImmediateSchedulerPriority, flushSyncCallbacks);
     }
+    // newCallbackNode 置 null
     newCallbackNode = null;
   } else {
     let schedulerPriorityLevel;
+    // 将lanes优先级转为普通事件优先级
     switch (lanesToEventPriority(nextLanes)) {
       case DiscreteEventPriority:
         schedulerPriorityLevel = ImmediateSchedulerPriority;
@@ -893,15 +915,19 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
         schedulerPriorityLevel = NormalSchedulerPriority;
         break;
     }
+    // 调用scheduleCallback传入判断好的scheduler优先级执行
     newCallbackNode = scheduleCallback(
       schedulerPriorityLevel,
       performConcurrentWorkOnRoot.bind(null, root),
     );
   }
 
+  // 赋值之前获取到的lane最高优先级
   root.callbackPriority = newCallbackPriority;
+  // 赋值newCallbackNode
   root.callbackNode = newCallbackNode;
 }
+
 
 // This is the entry point for every concurrent task, i.e. anything that
 // goes through Scheduler.
@@ -1443,39 +1469,57 @@ declare function flushSync<R>(fn: () => R): R;
 // eslint-disable-next-line no-redeclare
 declare function flushSync(): void;
 // eslint-disable-next-line no-redeclare
+
+/**
+ * 我感觉的作用:
+ *  将当前任务优先级提升至离散事件,执行完毕callback后,将优先级恢复
+ */
 export function flushSync(fn) {
   // In legacy mode, we flush pending passive effects at the beginning of the
   // next event, not at the end of the previous one.
   if (
+    // rootWithPendingPassiveEffects:null
     rootWithPendingPassiveEffects !== null &&
     rootWithPendingPassiveEffects.tag === LegacyRoot &&
+    // 判断权限
     (executionContext & (RenderContext | CommitContext)) === NoContext
   ) {
     flushPassiveEffects();
   }
 
+  // 保存执行上下文
   const prevExecutionContext = executionContext;
+  // 将执行上下文替换会批量上下文
   executionContext |= BatchedContext;
 
+  // ReactCurrentBatchConfig.transition:React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
   const prevTransition = ReactCurrentBatchConfig.transition;
+  // 获取当前更新优先级
   const previousPriority = getCurrentUpdatePriority();
 
   try {
+    // 赋值为null
     ReactCurrentBatchConfig.transition = null;
+    // 设置当前优先级为离散事件
     setCurrentUpdatePriority(DiscreteEventPriority);
     if (fn) {
+      // 执行callback
       return fn();
     } else {
       return undefined;
     }
   } finally {
+    // 最后设置当前更新优先级会之前获取的
     setCurrentUpdatePriority(previousPriority);
+    // 恢复之前的ReactCurrentBatchConfig.transition
     ReactCurrentBatchConfig.transition = prevTransition;
-
+    // 恢复之前的执行上下文
     executionContext = prevExecutionContext;
     // Flush the immediate callbacks that were scheduled during this batch.
     // Note that this will happen even if batchedUpdates is higher up
     // the stack.
+    
+    // 判断权限
     if ((executionContext & (RenderContext | CommitContext)) === NoContext) {
       flushSyncCallbacks();
     }

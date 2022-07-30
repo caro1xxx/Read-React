@@ -207,7 +207,7 @@ export function cloneUpdateQueue<State>(
   }
 }
 
-export function createUpdate(eventTime: number, lane: Lane): Update<*> {
+export function createUpdate(eventTime: number /**now() */, lane: Lane /**离散事件 */): Update<*> {
   const update: Update<*> = {
     eventTime,
     lane,
@@ -225,17 +225,22 @@ export function createUpdate(eventTime: number, lane: Lane): Update<*> {
   return update;
 }
 
+
+
 export function enqueueUpdate<State>(
-  fiber: Fiber,
-  update: Update<State>,
-  lane: Lane,
+  fiber: Fiber, //FiberHostRoot对象
+  update: Update<State>, //update对象
+  lane: Lane, //调度优先级
 ): FiberRoot | null {
+  // 获取当前fiber身上的updateQueue对象
+  // 只有当fiber渲染后,updateQueue才会有值,所以此时updateQueue是null
   const updateQueue = fiber.updateQueue;
   if (updateQueue === null) {
-    // Only occurs if the fiber has been unmounted.
+    // updateQueue为空, 说明当前的fiber还没有渲染, 直接退出即可
     return null;
   }
 
+  
   const sharedQueue: SharedQueue<State> = (updateQueue: any).shared;
 
   if (__DEV__) {
@@ -256,11 +261,17 @@ export function enqueueUpdate<State>(
   if (isUnsafeClassRenderPhaseUpdate(fiber)) {
     // This is an unsafe render phase update. Add directly to the update
     // queue so we can process it immediately during the current render.
-    const pending = sharedQueue.pending;
+    /**
+     * 以下操作就是:
+     *  首次会自己只想自己
+     *  后续就将循环指向,因为update也越来越多了,sharedQueue.pending永远是最后一个
+     */
+    const pending = sharedQueue.pending;// shared.pending指向该链表的最后一个update对象
     if (pending === null) {
-      // This is the first update. Create a circular list.
+      // 说明是`首次更新`, 需要`创建`循环链表
       update.next = update;
     } else {
+      // `不是首次更新`, 那就把update对象`插入`到循环链表中
       update.next = pending.next;
       pending.next = update;
     }

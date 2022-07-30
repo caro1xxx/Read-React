@@ -147,6 +147,7 @@ const Internals = {
   ],
 };
 
+// 入口 最终返回ReactDOMRoot对象
 function createRoot(
   container: Element | Document | DocumentFragment,
   options?: CreateRootOptions,

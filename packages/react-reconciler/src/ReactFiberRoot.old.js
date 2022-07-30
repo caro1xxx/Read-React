@@ -159,14 +159,15 @@ export function createFiberRoot(
     root.transitionCallbacks = transitionCallbacks;
   }
 
-  // Cyclic construction. This cheats the type system right now because
-  // stateNode is any.
+  // 创建FiberHostRoot对象
   const uninitializedFiber = createHostRootFiber(
     tag,
     isStrictMode,
     concurrentUpdatesByDefaultOverride,
   );
+  // 在FiberRoot对象上挂载current属性,值为FiberHostRoot对象
   root.current = uninitializedFiber;
+  // 在FiberHostRoot对象上挂载stateNode:FiberRoot
   uninitializedFiber.stateNode = root;
 
   if (enableCache) {
@@ -199,5 +200,6 @@ export function createFiberRoot(
 
   initializeUpdateQueue(uninitializedFiber);
 
+  // 返回挂载了FiberHostRoot对象的FiberRoot对象
   return root;
 }

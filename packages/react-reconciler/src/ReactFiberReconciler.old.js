@@ -138,11 +138,15 @@ if (__DEV__) {
   didWarnAboutFindNodeInStrictMode = {};
 }
 
+
+/**
+ * 获取子树上下文
+ */
 function getContextForSubtree(
-  parentComponent: ?React$Component<any, any>,
+  parentComponent: ?React$Component<any, any>, //null
 ): Object {
   if (!parentComponent) {
-    return emptyContextObject;
+    return emptyContextObject; //{};
   }
 
   const fiber = getInstance(parentComponent);
@@ -256,6 +260,8 @@ export function  createContainer(
 ): OpaqueRoot {
   const hydrate = false;
   const initialChildren = null;
+  
+  // 返回挂载了current属性的FiberRoot对象
   return createFiberRoot(
     containerInfo,
     tag,
@@ -318,15 +324,20 @@ export function createHydrationContainer(
   return root;
 }
 
+
+// 更新容器
 export function updateContainer(
-  element: ReactNodeList,
-  container: OpaqueRoot,
-  parentComponent: ?React$Component<any, any>,
-  callback: ?Function,
+  element: ReactNodeList, //app
+  container: OpaqueRoot, //ReactDOMRoot
+  parentComponent: ?React$Component<any, any>, //null
+  callback: ?Function,//callback
 ): Lane {
   if (__DEV__) {
     onScheduleRoot(container, element);
   }
+
+  // 获取current
+  // 此时ReactDOMRoot.current就是FiberHostRoot对象
   const current = container.current;
   // currentEventTime = now();
   const eventTime = requestEventTime();
@@ -337,6 +348,7 @@ export function updateContainer(
     markRenderScheduled(lane);
   }
 
+  // 因为parentComponent此时是null,所以context是{}
   const context = getContextForSubtree(parentComponent);
   if (container.context === null) {
     container.context = context;
@@ -361,11 +373,28 @@ export function updateContainer(
     }
   }
 
+  // 此时update={
+    // eventTime,
+    // lane,
+
+    // // export const UpdateState = 0;
+    // // export const ReplaceState = 1;
+    // // export const ForceUpdate = 2;
+    // // export const CaptureUpdate = 3;
+    // tag: UpdateState,
+    // payload: null,
+    // callback: null,
+
+    // next: null, //指向updateQueue中的下一个update
+  // }
   const update = createUpdate(eventTime, lane);
   // Caution: React DevTools currently depends on this property
   // being called "element".
+
+  // payload赋值 App
   update.payload = {element};
 
+  // callback存在
   callback = callback === undefined ? null : callback;
   if (callback !== null) {
     if (__DEV__) {
@@ -377,11 +406,13 @@ export function updateContainer(
         );
       }
     }
+    // 将callback函数挂载到update对象上
     update.callback = callback;
   }
 
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
+    // scheduleWork 就是 scheduleUpdateOnFiber
     scheduleUpdateOnFiber(root, current, lane, eventTime);
     entangleTransitions(root, current, lane);
   }
