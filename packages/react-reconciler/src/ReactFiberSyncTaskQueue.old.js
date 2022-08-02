@@ -28,6 +28,7 @@ export function scheduleSyncCallback(callback: SchedulerCallback) {
   } else {
     // Push onto existing queue. Don't need to schedule a callback because
     // we already scheduled one when we created the queue.
+    // 入队
     syncQueue.push(callback);
   }
 }
@@ -50,7 +51,7 @@ export function flushSyncCallbacksOnlyInLegacyMode() {
 
 export function flushSyncCallbacks() {
   if (!isFlushingSyncQueue && syncQueue !== null) {
-    // Prevent re-entrance.
+    // 防止重入
     isFlushingSyncQueue = true;
     let i = 0;
     const previousUpdatePriority = getCurrentUpdatePriority();

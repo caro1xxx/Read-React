@@ -173,18 +173,25 @@ if (__DEV__) {
   };
 }
 
+// 初始化updateQueue
 export function initializeUpdateQueue<State>(fiber: Fiber): void {
   const queue: UpdateQueue<State> = {
     baseState: fiber.memoizedState,
-    firstBaseUpdate: null,
-    lastBaseUpdate: null,
-    shared: {
+    firstBaseUpdate: null,//上一个更新流程中的开头的update
+    lastBaseUpdate: null,//上一个更新流程中结尾的update
+    shared: { 
+      // 指向最新 且完整的环状链条
+      //         A1  -> A2  -> A3
+      //          |             |
+      // pending(A6) -> A5  -> A4
+      // pending是一个完整的Queue
       pending: null,
       lanes: NoLanes,
       hiddenCallbacks: null,
     },
     callbacks: null,
   };
+  // 挂载queue
   fiber.updateQueue = queue;
 }
 
@@ -233,10 +240,29 @@ export function enqueueUpdate<State>(
   lane: Lane, //调度优先级
 ): FiberRoot | null {
   // 获取当前fiber身上的updateQueue对象
-  // 只有当fiber渲染后,updateQueue才会有值,所以此时updateQueue是null
+  // 当在初始化时,fiber.updateQueue是有值的
+  // 在ReactFiberRoot.old.js 202行,initializeUpdateQueue()时进行了挂载queue
+  /**
+   * fiber.updateQueue: UpdateQueue<State> = {
+      baseState: fiber.memoizedState, //前一次的计算结果
+      firstBaseUpdate: null,//上一个更新流程中被跳过的开头的update
+      lastBaseUpdate: null,//上一个更新流程中被跳过的结尾的update
+      shared: { 
+        // 指向最新 且完整的环状链条
+        //         A1  -> A2  -> A3
+        //          |             |
+        // pending(A6) -> A5  -> A4
+        // pending是一个完整的Queue
+        pending: null,
+        lanes: NoLanes,
+        hiddenCallbacks: null,
+      },
+      callbacks: null,
+    };
+   */
   const updateQueue = fiber.updateQueue;
   if (updateQueue === null) {
-    // updateQueue为空, 说明当前的fiber还没有渲染, 直接退出即可
+    // 如果是卸载,那么就返回null
     return null;
   }
 
@@ -263,16 +289,27 @@ export function enqueueUpdate<State>(
     // queue so we can process it immediately during the current render.
     /**
      * 以下操作就是:
-     *  首次会自己只想自己
-     *  后续就将循环指向,因为update也越来越多了,sharedQueue.pending永远是最后一个
+     *  首次会自己指向自己
+     *  后续就将循环指向,因为update也越来越多了,sharedQueue.pending永远是最新的
+     *  pending.next则指向最老的update
      */
-    const pending = sharedQueue.pending;// shared.pending指向该链表的最后一个update对象
+    const pending = sharedQueue.pending;// shared.pending指向该链表的最新的update对象
     if (pending === null) {
       // 说明是`首次更新`, 需要`创建`循环链表
       update.next = update;
     } else {
       // `不是首次更新`, 那就把update对象`插入`到循环链表中
-      update.next = pending.next;
+      /**
+       * chain = a -> b -> c
+       * pending = c  pending.next = a
+       * update = d d为新入队的任务
+       * update.next = pending.next  即是a
+       * pending.next = update; 即是d
+       * 执行sharedQueue.pending = update; 
+       * 此时pending为d,pending.next为a
+       * 最终:a-> b -> c -> d
+       */
+      update.next = pending.next; 
       pending.next = update;
     }
     sharedQueue.pending = update;
@@ -281,6 +318,8 @@ export function enqueueUpdate<State>(
     // this fiber. This is for backwards compatibility in the case where you
     // update a different component during render phase than the one that is
     // currently renderings (a pattern that is accompanied by a warning).
+    
+    // return root
     return unsafe_markUpdateLaneFromFiberToRoot(fiber, lane);
   } else {
     return enqueueConcurrentClassUpdate(fiber, sharedQueue, update, lane);

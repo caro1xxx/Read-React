@@ -163,34 +163,41 @@ export function enqueueConcurrentRenderForLane(
 // Calling this function outside this module should only be done for backwards
 // compatibility and should always be accompanied by a warning.
 export function unsafe_markUpdateLaneFromFiberToRoot(
-  sourceFiber: Fiber,
-  lane: Lane,
+  sourceFiber: Fiber,//FiberHostRoot对象
+  lane: Lane,//调度优先级
 ): FiberRoot | null {
   // NOTE: For Hyrum's Law reasons, if an infinite update loop is detected, it
   // should throw before `markUpdateLaneFromFiberToRoot` is called. But this is
   // undefined behavior and we can change it if we need to; it just so happens
   // that, at the time of this writing, there's an internal product test that
   // happens to rely on this.
+
+  // 这里root要么是{stateNode:FiberRoot},要么是null
   const root = getRootForUpdatedFiber(sourceFiber);
   markUpdateLaneFromFiberToRoot(sourceFiber, null, lane);
   return root;
 }
 
 function markUpdateLaneFromFiberToRoot(
-  sourceFiber: Fiber,
-  update: ConcurrentUpdate | null,
-  lane: Lane,
+  sourceFiber: Fiber,//FiberHostRoot对象
+  update: ConcurrentUpdate | null,//null
+  lane: Lane,//调度优先级
 ): void {
-  // Update the source fiber's lanes
+  // 合并lanes
   sourceFiber.lanes = mergeLanes(sourceFiber.lanes, lane);
+  // alternate用于备份
   let alternate = sourceFiber.alternate;
   if (alternate !== null) {
+    // 再将alternate的lanes合并
     alternate.lanes = mergeLanes(alternate.lanes, lane);
   }
   // Walk the parent path to the root and update the child lanes.
   let isHidden = false;
+  // 获取父节点
   let parent = sourceFiber.return;
+  // 保存FiberHostRoot对象
   let node = sourceFiber;
+  // 一会合并lanes,直到达到root节点
   while (parent !== null) {
     parent.childLanes = mergeLanes(parent.childLanes, lane);
     alternate = parent.alternate;
@@ -232,12 +239,14 @@ function markUpdateLaneFromFiberToRoot(
   }
 }
 
-function getRootForUpdatedFiber(sourceFiber: Fiber): FiberRoot | null {
+function getRootForUpdatedFiber(sourceFiber /**FiberHostRoot对象 */: Fiber): FiberRoot | null {
   // TODO: We will detect and infinite update loop and throw even if this fiber
   // has already unmounted. This isn't really necessary but it happens to be the
   // current behavior we've used for several release cycles. Consider not
   // performing this check if the updated fiber already unmounted, since it's
   // not possible for that to cause an infinite update loop.
+
+  //判断是否是无限循环
   throwIfInfiniteUpdateLoopDetected();
 
   // When a setState happens, we must ensure the root is scheduled. Because
@@ -247,14 +256,28 @@ function getRootForUpdatedFiber(sourceFiber: Fiber): FiberRoot | null {
   // the `childLanes`, anyway, but now those two traversals happen at
   // different times.
   // TODO: Consider adding a `root` backpointer on the update queue.
+
+  // detectUpdateOnUnmountedFiber()方法在DEV情况下才有执行
   detectUpdateOnUnmountedFiber(sourceFiber, sourceFiber);
+  //保存FiberHostRoot对象
   let node = sourceFiber;
+
+  /**
+   * return 指向父节点
+    return:父节点
+    next:子节点
+    sub:兄弟节点
+   */
   let parent = node.return;
+  // 一直循环查找父节点,直到找到最终的根节点
   while (parent !== null) {
     detectUpdateOnUnmountedFiber(sourceFiber, node);
     node = parent;
     parent = node.return;
   }
+  // 最后判断循环找到的根节点,和传入的sourceFiber是否一致
+  // 如果一致则返回node.stateNode: FiberRoot
+  // 否则返回null
   return node.tag === HostRoot ? (node.stateNode: FiberRoot) : null;
 }
 

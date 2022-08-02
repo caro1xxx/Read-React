@@ -339,9 +339,9 @@ export function updateContainer(
   // 获取current
   // 此时ReactDOMRoot.current就是FiberHostRoot对象
   const current = container.current;
-  // currentEventTime = now();
+  // 当前时间戳
   const eventTime = requestEventTime();
-  // DiscreteEventPriority 离散事件
+  // 创建一个优先级变量(车道模型)
   const lane = requestUpdateLane(current);
 
   if (enableSchedulingProfiler) {
@@ -387,9 +387,8 @@ export function updateContainer(
 
     // next: null, //指向updateQueue中的下一个update
   // }
+  // 根据车道优先级, 创建update对象, 并加入fiber.updateQueue.pending队列
   const update = createUpdate(eventTime, lane);
-  // Caution: React DevTools currently depends on this property
-  // being called "element".
 
   // payload赋值 App
   update.payload = {element};
@@ -410,6 +409,8 @@ export function updateContainer(
     update.callback = callback;
   }
 
+  // 首次enqueueUpdate()返回null
+  // 后续就返回root
   const root = enqueueUpdate(current, update, lane);
   if (root !== null) {
     // scheduleWork 就是 scheduleUpdateOnFiber

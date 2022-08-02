@@ -198,6 +198,7 @@ export function createFiberRoot(
     uninitializedFiber.memoizedState = initialState;
   }
 
+  // 是有挂载updateQueue对象的
   initializeUpdateQueue(uninitializedFiber);
 
   // 返回挂载了FiberHostRoot对象的FiberRoot对象

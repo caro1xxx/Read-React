@@ -405,43 +405,62 @@ function computeExpirationTime(lane: Lane, currentTime: number) {
 }
 
 export function markStarvedLanesAsExpired(
-  root: FiberRoot,
-  currentTime: number,
+  root: FiberRoot, //root
+  currentTime: number, //事件发生时间戳
 ): void {
   // TODO: This gets called every time we yield. We can optimize by storing
   // the earliest expiration time on the root. Then use that to quickly bail out
   // of this function.
 
+  
   const pendingLanes = root.pendingLanes;
   const suspendedLanes = root.suspendedLanes;
   const pingedLanes = root.pingedLanes;
   const expirationTimes = root.expirationTimes;
 
-  // Iterate through the pending lanes and check if we've reached their
-  // expiration time. If so, we'll assume the update is being starved and mark
-  // it as expired to force it to finish.
+  // 遍历待处理通道，并检查我们是否已经达到了它们的
+  // 过期时间。如果是这样，我们将假定更新被饿死，并将其标记为
+  // 标记为过期，并把它的lane放到expiredLanes
   let lanes = pendingLanes;
+  // 这里判断lane是否有权限,即代表全是0的lane是无权限的,则不进入
   while (lanes > 0) {
+    /*
+      pickArbitraryLaneIndex是找到lanes中最靠左的那个1在lanes中的index
+      也就是获取到当前这个lane在expirationTimes中对应的index
+      比如 0b0010，得出的index就是2，就可以去expirationTimes中获取index为2
+      位置上的过期时间
+    */
     const index = pickArbitraryLaneIndex(lanes);
     const lane = 1 << index;
+    // 上边两行的计算过程举例如下：
+    //   lanes = 0b0000000000000000000000000011100
+    //   index = 4
+
+    //       1 = 0b0000000000000000000000000000001
+    //  1 << 4 = 0b0000000000000000000000000001000
+
+    //    lane = 0b0000000000000000000000000001000
 
     const expirationTime = expirationTimes[index];
+    // 这里就是在判断之前是否存在过expirationTimes[index]
     if (expirationTime === NoTimestamp) {
-      // Found a pending lane with no expiration time. If it's not suspended, or
-      // if it's pinged, assume it's CPU-bound. Compute a new expiration time
-      // using the current time.
+      // 发现一个没有过期时间并且待处理的lane，如果它没被挂起，
+      // 或者被触发了，那么去计算过期时间
       if (
+        // 代表没有被挂起
         (lane & suspendedLanes) === NoLanes ||
+        // 代表没有被触发
         (lane & pingedLanes) !== NoLanes
       ) {
         // Assumes timestamps are monotonically increasing.
         expirationTimes[index] = computeExpirationTime(lane, currentTime);
       }
     } else if (expirationTime <= currentTime) {
-      // This lane expired
+      //小于当前时间说明已经过期
+      // 已经过期，将lane并入到expiredLanes中，实现了将lanes标记为过期
       root.expiredLanes |= lane;
     }
-
+    // 将lane从lanes中删除，每循环一次删除一个，直到lanes清空成0，结束循环
     lanes &= ~lane;
   }
 }
@@ -614,6 +633,7 @@ export function markRootUpdated(
   }
 
   const eventTimes = root.eventTimes;
+  // laneToIndex()计算lane的前导0的个数
   const index = laneToIndex(updateLane);
   // We can always overwrite an existing timestamp because we prefer the most
   // recent event, and we assume time is monotonically increasing.

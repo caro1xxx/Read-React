@@ -108,6 +108,7 @@ function noopOnRecoverableError() {
   // legacy API.
 }
 
+
 function legacyCreateRootFromDOMContainer(
   container: Container, //dom
   initialChildren: ReactNodeList, //App
@@ -231,6 +232,7 @@ function legacyRenderSubtreeIntoContainer(
      * _reactRootContainer一定不存在,因为初始化的时候没有这个属性
      * 所以从DOM容器创建root
      */
+    // 从dom容器创建根
     root = legacyCreateRootFromDOMContainer(
       container, //dom
       children, //App
@@ -240,7 +242,7 @@ function legacyRenderSubtreeIntoContainer(
     );
   } else {
     // 在已经初始化完成后,后续的maybeRoot一定会有_reactRootContainer属性
-    //存在的情况,说明已经初始化过了
+    // 存在的情况,说明已经初始化过了
     root = maybeRoot;
     if (typeof callback === 'function') {
       const originalCallback = callback;
