@@ -901,10 +901,14 @@ export function getTransitionsForLanes(
 
   const transitionsForLanes = [];
   while (lanes > 0) {
+    // 获取lanes的最左边的1出现的第一个位置的index
     const index = laneToIndex(lanes);
     const lane = 1 << index;
     const transitions = root.transitionLanes[index];
+    // 判断是否存在过transitions[index]
     if (transitions !== null) {
+      // 这里对transitions使用forEach说明如果transitions存在那么是个数组
+      // 然后依次将transitions内元素push到transitionsForLanes
       transitions.forEach(transition => {
         transitionsForLanes.push(transition);
       });
@@ -913,10 +917,12 @@ export function getTransitionsForLanes(
     lanes &= ~lane;
   }
 
+  // 这里如果是0,说明指定transitions不存在于root
   if (transitionsForLanes.length === 0) {
     return null;
   }
 
+  // 否则返回具有transitions[index]所有元素的transitionsForLanes
   return transitionsForLanes;
 }
 

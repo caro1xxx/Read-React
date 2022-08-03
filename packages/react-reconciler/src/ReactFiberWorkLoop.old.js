@@ -994,7 +994,9 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
     (disableSchedulerTimeoutInWorkLoop || !didTimeout);
   // shouldTimeSlice: false
   let exitStatus = shouldTimeSlice
+  // performConcurrentWorkOnRoot 会调用该方法
     ? renderRootConcurrent(root, lanes)
+  // performSyncWorkOnRoot 会调用该方法
     : renderRootSync(root, lanes);
   if (exitStatus !== RootInProgress) {
     if (exitStatus === RootErrored) {
@@ -1826,7 +1828,9 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
       }
     }
 
+    // getTransitionsForLanes()获取一下root上的transitions
     workInProgressTransitions = getTransitionsForLanes(root, lanes);
+    // 在该函数内开启双缓存树
     prepareFreshStack(root, lanes);
   }
 
@@ -1883,6 +1887,9 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
 function workLoopSync() {
   // Already timed out, so perform work without checking if we need to yield.
   while (workInProgress !== null) {
+    // performUnitOfWork方法会创建下一个Fiber节点并赋值给workInProgress，
+    // 并将workInProgress与已创建的Fiber节点连接起来构成Fiber树
+    // performUnitOfWork的工作可以分为两部分：“递”和“归”
     performUnitOfWork(workInProgress);
   }
 }
@@ -1979,12 +1986,21 @@ function performUnitOfWork(unitOfWork: Fiber): void {
   // The current, flushed, state of this fiber is the alternate. Ideally
   // nothing should rely on this, but relying on it here means that we don't
   // need an additional field on the work in progress.
+  // unitOfWork.alternate是节点副本
   const current = unitOfWork.alternate;
   setCurrentDebugFiberInDEV(unitOfWork);
 
   let next;
+  // export const ProfileMode = /*                    */ 0b000010;
+  // export const NoMode = /*                         */ 0b000000;
+  // 0b000000转换为boolean值是false
+
+  // 无论如何都会执行beginWork()的
+  // 只不过如果是true的情况会记录时间
   if (enableProfilerTimer && (unitOfWork.mode & ProfileMode) !== NoMode) {
     startProfilerTimer(unitOfWork);
+    //renderLanes = NoLanes
+    // 递
     next = beginWork(current, unitOfWork, renderLanes);
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {
@@ -1994,7 +2010,8 @@ function performUnitOfWork(unitOfWork: Fiber): void {
   resetCurrentDebugFiberInDEV();
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
-    // If this doesn't spawn new work, complete the current work.
+    // 如果没有了新的任务,就完成了
+    // 归
     completeUnitOfWork(unitOfWork);
   } else {
     workInProgress = next;
@@ -3090,25 +3107,25 @@ export function warnAboutUpdateOnNotYetMountedFiberInDEV(fiber: Fiber) {
 let beginWork;
 if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
   const dummyFiber = null;
-  beginWork = (current, unitOfWork, lanes) => {
-    // If a component throws an error, we replay it again in a synchronously
-    // dispatched event, so that the debugger will treat it as an uncaught
-    // error See ReactErrorUtils for more information.
+  // 这里的beginWork相当于一个包装器
+  beginWork = (current, unitOfWork, lanes /*Nolane */) => {
+    // 如果一个组件抛出了一个错误，我们会在一个同步派发的事
+    // 件中再次重放它，这样调试器就会把它当作一个未捕获的错误来处理
 
-    // Before entering the begin phase, copy the work-in-progress onto a dummy
-    // fiber. If beginWork throws, we'll use this to reset the state.
+    // 在进入开始阶段之前，把正在进行的工作复制到一个假纤维上。如果beginWork抛出，我们将用它来重置状态。
     const originalWorkInProgressCopy = assignFiberPropertiesInDEV(
       dummyFiber,
-      unitOfWork,
+      unitOfWork
     );
     try {
+      // 真正的beginWork()
       return originalBeginWork(current, unitOfWork, lanes);
     } catch (originalError) {
       if (
         didSuspendOrErrorWhileHydratingDEV() ||
         (originalError !== null &&
-          typeof originalError === 'object' &&
-          typeof originalError.then === 'function')
+          typeof originalError === "object" &&
+          typeof originalError.then === "function")
       ) {
         // Don't replay promises.
         // Don't replay errors if we are hydrating and have already suspended or handled an error
@@ -3140,16 +3157,16 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
         null,
         current,
         unitOfWork,
-        lanes,
+        lanes
       );
 
       if (hasCaughtError()) {
         const replayError = clearCaughtError();
         if (
-          typeof replayError === 'object' &&
+          typeof replayError === "object" &&
           replayError !== null &&
           replayError._suppressLogging &&
-          typeof originalError === 'object' &&
+          typeof originalError === "object" &&
           originalError !== null &&
           !originalError._suppressLogging
         ) {
