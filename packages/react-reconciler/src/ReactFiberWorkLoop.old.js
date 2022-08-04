@@ -1846,6 +1846,7 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
 
   do {
     try {
+      // 同步工作循环
       workLoopSync();
       break;
     } catch (thrownValue) {
@@ -2008,12 +2009,14 @@ function performUnitOfWork(unitOfWork: Fiber): void {
   }
 
   resetCurrentDebugFiberInDEV();
+  // 收集props
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
     // 如果没有了新的任务,就完成了
     // 归
     completeUnitOfWork(unitOfWork);
   } else {
+    // 反正继续 执行beginWork()
     workInProgress = next;
   }
 

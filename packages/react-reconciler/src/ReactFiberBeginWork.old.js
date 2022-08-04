@@ -7,7 +7,7 @@
  * @flow
  */
 
-import type {
+ import type {
   ReactProviderType,
   ReactContext,
   ReactNodeList,
@@ -3597,9 +3597,8 @@ function checkScheduledUpdateOrContext(
   current: Fiber,
   renderLanes: Lanes,
 ): boolean {
-  // Before performing an early bailout, we must check if there are pending
-  // updates or context.
   const updateLanes = current.lanes;
+  // 判断当前Fiber极端上的lanes是否存在于renderLanes上，存在则说明该Fiber节点需要更新，反之不需要
   if (includesSomeLane(updateLanes, renderLanes)) {
     return true;
   }
@@ -3827,7 +3826,9 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
   return bailoutOnAlreadyFinishedWork(current, workInProgress, renderLanes);
 }
 
+// 真正的beginWork()
 function beginWork(
+  // current在初次挂载阶段一定会是null
   current: Fiber | null,
   workInProgress: Fiber,
   renderLanes: Lanes,
@@ -3850,12 +3851,24 @@ function beginWork(
     }
   }
 
+  // 即mount时current === null
+  // 组件update时，由于之前已经mount过，所以current !== null。
+  // 所以我们可以通过current === null ?来区分组件是处于mount还是update
+  // update时：如果current存在可能存在优化路径，可以复用current（即上一次更新的Fiber节点）
+  // update时
   if (current !== null) {
-    const oldProps = current.memoizedProps;
-    const newProps = workInProgress.pendingProps;
+    const oldProps = current.memoizedProps;// 上一次更新的props
+    const newProps = workInProgress.pendingProps; // 本次更新的props
 
+    // didReceiveUpdate  表示是否有新的props更新，有则会设置为true，没有则是false
     if (
       oldProps !== newProps ||
+      /*
+        hasLegacyContextChanged判断了是否有老版本context使用并且发生变化
+        react源码中存在一个valueStack和valueCursor用来记录context的历史信息和当前context，
+        另外还有一个didPerformWorkStackCursor用来表示当前的context有没有变化
+        hasLegacyContextChanged就会返回didPerformWorkStackCursor
+      */
       hasLegacyContextChanged() ||
       // Force a re-render if the implementation changed due to hot reload:
       (__DEV__ ? workInProgress.type !== current.type : false)
@@ -3864,8 +3877,8 @@ function beginWork(
       // This may be unset if the props are determined to be equal later (memo).
       didReceiveUpdate = true;
     } else {
-      // Neither props nor legacy context changes. Check if there's a pending
-      // update or context change.
+      // checkScheduledUpdateOrContext函数检查当前fiber节点上的lanes是否存在于renderLanes中
+      // 存在则说明当前fiber节点需要更新，不存在则不需要更新则复用之前的节点
       const hasScheduledUpdateOrContext = checkScheduledUpdateOrContext(
         current,
         renderLanes,
@@ -3876,8 +3889,8 @@ function beginWork(
         // may not be work scheduled on `current`, so we check for this flag.
         (workInProgress.flags & DidCapture) === NoFlags
       ) {
-        // No pending updates or context. Bail out now.
         didReceiveUpdate = false;
+        // 复用之前的节点
         return attemptEarlyBailoutIfNoScheduledUpdate(
           current,
           workInProgress,
@@ -3897,6 +3910,7 @@ function beginWork(
       }
     }
   } else {
+    // mount时
     didReceiveUpdate = false;
 
     if (getIsHydrating() && isForkedChild(workInProgress)) {
@@ -3922,6 +3936,8 @@ function beginWork(
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
 
+  // 这里只会是mount时执行,因为在update执行完后已经return了
+  // 首先会根据不同 Fiber 节点的 tag，执行不同的 case，进入不同类型的 Fiber 子节点创建逻辑
   switch (workInProgress.tag) {
     case IndeterminateComponent: {
       return mountIndeterminateComponent(

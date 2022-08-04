@@ -118,7 +118,7 @@ function getMaskedContext(
 }
 
 function hasContextChanged(): boolean {
-  if (disableLegacyContext) {
+  if (disableLegacyContext/*false */) {
     return false;
   } else {
     return didPerformWorkStackCursor.current;
