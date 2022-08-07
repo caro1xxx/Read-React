@@ -1983,7 +1983,7 @@ function workLoopConcurrent() {
   }
 }
 
-function performUnitOfWork(unitOfWork: Fiber): void {
+function performUnitOfWork(unitOfWork: Fiber /*workInProgress */): void {
   // The current, flushed, state of this fiber is the alternate. Ideally
   // nothing should rely on this, but relying on it here means that we don't
   // need an additional field on the work in progress.
@@ -2003,6 +2003,7 @@ function performUnitOfWork(unitOfWork: Fiber): void {
     //renderLanes = NoLanes
     // 递
     next = beginWork(current, unitOfWork, renderLanes);
+    // 停止profiler计时器
     stopProfilerTimerIfRunningAndRecordDelta(unitOfWork, true);
   } else {
     next = beginWork(current, unitOfWork, renderLanes);
@@ -2012,11 +2013,11 @@ function performUnitOfWork(unitOfWork: Fiber): void {
   // 收集props
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
-    // 如果没有了新的任务,就完成了
+    // 如果没有了新的任务,就执行 "归" 操作
     // 归
     completeUnitOfWork(unitOfWork);
   } else {
-    // 反正继续 执行beginWork()
+    // 反之继续 执行beginWork()
     workInProgress = next;
   }
 
@@ -2024,51 +2025,69 @@ function performUnitOfWork(unitOfWork: Fiber): void {
 }
 
 function completeUnitOfWork(unitOfWork: Fiber): void {
-  // Attempt to complete the current unit of work, then move to the next
-  // sibling. If there are no more siblings, return to the parent fiber.
+  // 尝试完成当前单位的工作，然后转到下一个
+  // 兄弟节点。如果没有更多的兄弟节点，则返回到父fiber。
   let completedWork = unitOfWork;
   do {
     // The current, flushed, state of this fiber is the alternate. Ideally
     // nothing should rely on this, but relying on it here means that we don't
     // need an additional field on the work in progress.
+    // 赋值alternate
     const current = completedWork.alternate;
+    // 获取当前节点的父节点 return就是指向父节点的
     const returnFiber = completedWork.return;
 
     // Check if the work completed or if something threw.
+
+    // Incomplete = 0b00000000001000000000000000;
+    // 没有异常
     if ((completedWork.flags & Incomplete) === NoFlags) {
       setCurrentDebugFiberInDEV(completedWork);
       let next;
+
+      // 没有启动性能记录
       if (
         !enableProfilerTimer ||
         (completedWork.mode & ProfileMode) === NoMode
       ) {
+         // 执行 completeWork
         next = completeWork(current, completedWork, renderLanes);
       } else {
+      // 反之开启性能记录
         startProfilerTimer(completedWork);
+        // 再执行completeWork
         next = completeWork(current, completedWork, renderLanes);
         // Update render duration assuming we didn't error.
         stopProfilerTimerIfRunningAndRecordDelta(completedWork, false);
       }
       resetCurrentDebugFiberInDEV();
 
+      // 如果next存在，则表示产生了新 work
       if (next !== null) {
         // Completing this fiber spawned new work. Work on that next.
+
+        // 这里我什么用next把原本的workInProgress覆盖了?????
         workInProgress = next;
         return;
       }
+      // 若是该 fiber 节点未能完成 work 的话(异常)
     } else {
       // This fiber did not complete because something threw. Pop values off
       // the stack without entering the complete phase. If this is a boundary,
       // capture values if possible.
+      // 节点未能完成更新，捕获其中的错误
       const next = unwindWork(current, completedWork, renderLanes);
 
       // Because this fiber did not complete, don't reset its lanes.
 
+      // 如果next存在，则表示产生了新 work
       if (next !== null) {
         // If completing this work spawned new work, do that next. We'll come
         // back here again.
         // Since we're restarting, remove anything that is not a host effect
         // from the effect tag.
+        
+        // HostEffectMask = 0b00000000000111111111111111
         next.flags &= HostEffectMask;
         workInProgress = next;
         return;
@@ -3137,6 +3156,7 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
 
       // Keep this code in sync with handleError; any changes here must have
       // corresponding changes there.
+      // 重置语境依赖
       resetContextDependencies();
       resetHooksAfterThrow();
       // Don't reset current debug fiber, since we're about to work on the
@@ -3145,7 +3165,7 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
       // Unwind the failed stack frame
       unwindInterruptedWork(current, unitOfWork, workInProgressRootRenderLanes);
 
-      // Restore the original properties of the fiber.
+      // 将在3119行执行的assignFiberPropertiesInDEV恢复之前的状态
       assignFiberPropertiesInDEV(unitOfWork, originalWorkInProgressCopy);
 
       if (enableProfilerTimer && unitOfWork.mode & ProfileMode) {
@@ -3153,7 +3173,8 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
         startProfilerTimer(unitOfWork);
       }
 
-      // Run beginWork again.
+      // 再一次执行beginWork()
+      // invokeGuardedCallback()帮助收集错误
       invokeGuardedCallback(
         null,
         originalBeginWork,

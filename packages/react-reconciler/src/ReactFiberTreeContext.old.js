@@ -231,14 +231,16 @@ export function popTreeContext(workInProgress: Fiber) {
   // different reasons. We have to keep popping until the work-in-progress is
   // no longer at the top of the stack.
 
-  while (workInProgress === treeForkProvider) {
+  while (workInProgress === treeForkProvider /* null */) {
+    // forkStack初始为一个空数组
+    // forkStackIndex初始为0
     treeForkProvider = forkStack[--forkStackIndex];
     forkStack[forkStackIndex] = null;
     treeForkCount = forkStack[--forkStackIndex];
     forkStack[forkStackIndex] = null;
   }
 
-  while (workInProgress === treeContextProvider) {
+  while (workInProgress === treeContextProvider /* null */) {
     treeContextProvider = idStack[--idStackIndex];
     idStack[idStackIndex] = null;
     treeContextOverflow = idStack[--idStackIndex];

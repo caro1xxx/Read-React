@@ -250,6 +250,7 @@ if (supportsMutation) {
   updateHostContainer = function(current: null | Fiber, workInProgress: Fiber) {
     // Noop
   };
+
   updateHostComponent = function(
     current: Fiber,
     workInProgress: Fiber,
@@ -259,7 +260,10 @@ if (supportsMutation) {
   ) {
     // If we have an alternate, that means this is an update and we need to
     // schedule a side-effect to do the updates.
+
+    // 获取已经记录的props
     const oldProps = current.memoizedProps;
+    // 如果新旧props一直,则退出
     if (oldProps === newProps) {
       // In mutation mode, this is sufficient for a bailout because
       // we won't touch this node even if children changed.
@@ -270,6 +274,8 @@ if (supportsMutation) {
     // have newProps so we'll have to reuse them.
     // TODO: Split the update API as separate for the props vs. children.
     // Even better would be if children weren't special cased at all tho.
+
+    // 获取真实节点
     const instance: Instance = workInProgress.stateNode;
     const currentHostContext = getHostContext();
     // TODO: Experiencing an error where oldProps is null. Suggests a host
@@ -283,7 +289,8 @@ if (supportsMutation) {
       rootContainerInstance,
       currentHostContext,
     );
-    // TODO: Type this specific to this type of component.
+    
+    // 被处理完的props会被赋值给workInProgress.updateQueue
     workInProgress.updateQueue = (updatePayload: any);
     // If the update payload indicates that there is a change or if there
     // is a new ref we mark this as an update. All the work is done in commitWork.
@@ -291,6 +298,7 @@ if (supportsMutation) {
       markUpdate(workInProgress);
     }
   };
+  // 比对更新节点中的文本
   updateHostText = function(
     current: Fiber,
     workInProgress: Fiber,
@@ -641,6 +649,7 @@ function cutOffTailIfNeeded(
 }
 
 function bubbleProperties(completedWork: Fiber) {
+  // 判断备份节点和缓存树中是否一致
   const didBailout =
     completedWork.alternate !== null &&
     completedWork.alternate.child === completedWork.child;
@@ -657,6 +666,10 @@ function bubbleProperties(completedWork: Fiber) {
       let treeBaseDuration = ((completedWork.selfBaseDuration: any): number);
 
       let child = completedWork.child;
+
+      // 这里就是循环获取节点的子节点
+      // 结束条件为不存在子节点了
+      // 只要一直存在子节点,那么就会一直mergeLanes,并且累计work时长
       while (child !== null) {
         newChildLanes = mergeLanes(
           newChildLanes,
@@ -673,14 +686,20 @@ function bubbleProperties(completedWork: Fiber) {
         // this value will reflect the amount of time spent working on a previous
         // render. In that case it should not bubble. We determine whether it was
         // cloned by comparing the child pointer.
-        actualDuration += child.actualDuration;
 
+        //累计 fiber 的 work 时长
+        actualDuration += child.actualDuration;
+        //累计 fiber 树的 work 时长
         treeBaseDuration += child.treeBaseDuration;
+        //移动到兄弟节点，重复上述过程
         child = child.sibling;
       }
 
+      //更新 fiber 的 work 时长
       completedWork.actualDuration = actualDuration;
+      //更新 fiber 树的 work 时长
       completedWork.treeBaseDuration = treeBaseDuration;
+    //逻辑同上，不再赘述
     } else {
       let child = completedWork.child;
       while (child !== null) {
@@ -702,6 +721,9 @@ function bubbleProperties(completedWork: Fiber) {
     }
 
     completedWork.subtreeFlags |= subtreeFlags;
+  // 如果是执行这个else,那么说明didBailout未false
+  // 了,缓存树和备份节点不一致
+  // 执行逻辑同上，不再赘述
   } else {
     // Bubble up the earliest expiration time.
     if (enableProfilerTimer && (completedWork.mode & ProfileMode) !== NoMode) {
@@ -847,6 +869,8 @@ function completeDehydratedSuspenseBoundary(
   }
 }
 
+// completeWork函数，主要是根据tag，处理不同类型的Component，
+// 很多类型Component是直接返回的，主要处理的是可以生成DOM的component
 function completeWork(
   current: Fiber | null,
   workInProgress: Fiber,
@@ -857,6 +881,7 @@ function completeWork(
   // to the current tree provider fiber is just as fast and less error-prone.
   // Ideally we would have a special version of the work loop only
   // for hydration.
+
   popTreeContext(workInProgress);
   switch (workInProgress.tag) {
     case IndeterminateComponent:
@@ -966,6 +991,8 @@ function completeWork(
       popHostContext(workInProgress);
       const rootContainerInstance = getRootHostContainer();
       const type = workInProgress.type;
+      // current !== null说明是更新
+      // 针对HostComponent,还需要判断Fiber节点是否存在对应的DOM节点
       if (current !== null && workInProgress.stateNode != null) {
         updateHostComponent(
           current,
@@ -978,6 +1005,7 @@ function completeWork(
         if (current.ref !== workInProgress.ref) {
           markRef(workInProgress);
         }
+      // 反之就是挂载
       } else {
         if (!newProps) {
           if (workInProgress.stateNode === null) {
@@ -991,6 +1019,7 @@ function completeWork(
           bubbleProperties(workInProgress);
           return null;
         }
+
 
         const currentHostContext = getHostContext();
         // TODO: Move createInstance to beginWork and keep it on a context
@@ -1013,6 +1042,7 @@ function completeWork(
             markUpdate(workInProgress);
           }
         } else {
+          // // 为fiber创建对应DOM节点
           const instance = createInstance(
             type,
             newProps,
@@ -1021,13 +1051,17 @@ function completeWork(
             workInProgress,
           );
 
+          // 将子孙DOM节点插入上一步生成的DOM节点中
           appendAllChildren(instance, workInProgress, false, false);
-
+          // DOM节点赋值给fiber.stateNode
           workInProgress.stateNode = instance;
 
           // Certain renderers require commit-time effects for initial mount.
           // (eg DOM renderer supports auto-focus for certain elements).
           // Make sure such renderers get scheduled for later work.
+
+          // 与update逻辑中的updateHostComponent类似的处理props的过程
+          // 相当于处理props
           if (
             finalizeInitialChildren(
               instance,
@@ -1046,6 +1080,7 @@ function completeWork(
           markRef(workInProgress);
         }
       }
+      // 泡沫 属性
       bubbleProperties(workInProgress);
       return null;
     }

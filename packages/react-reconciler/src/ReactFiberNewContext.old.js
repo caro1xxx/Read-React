@@ -62,8 +62,8 @@ let lastFullyObservedContext: ReactContext<any> | null = null;
 let isDisallowedContextReadInDEV: boolean = false;
 
 export function resetContextDependencies(): void {
-  // This is called right before React yields execution, to ensure `readContext`
-  // cannot be called outside the render phase.
+  // 这是在React执行前调用的，以确保`readContext
+  // 不能在渲染阶段之外被调用。
   currentlyRenderingFiber = null;
   lastContextDependency = null;
   lastFullyObservedContext = null;
