@@ -1675,6 +1675,7 @@
   }
 
   function track(node) {
+    // return node._valueTracker;
     if (getTracker(node)) {
       return;
     } // TODO: Once it's just Fiber we can move this to node._wrapperState
@@ -2001,7 +2002,9 @@
   function validateProps(element, props) {
     {
       // If a value is not provided, then the children must be simple.
+      // 如果没有props.value
       if (props.value == null) {
+        // 判断<option>标签的子节点是否是 number/string
         if (typeof props.children === 'object' && props.children !== null) {
           React.Children.forEach(props.children, function (child) {
             if (child == null) {
@@ -9109,17 +9112,25 @@
 
   function listenToNonDelegatedEvent(domEventName, targetElement) {
     {
+      //   var nonDelegatedEvents = new Set(['cancel', 'close', 'invalid', 'load', 'scroll', 'toggle'].concat(mediaEventTypes));
+      // 判断nonDelegatedEvents集合是否包含domEventName
+      // nonDelegatedEvents代表非官方授权事件集
       if (!nonDelegatedEvents.has(domEventName)) {
         error('Did not expect a listenToNonDelegatedEvent() call for "%s". ' + 'This is a bug in React. Please file an issue.', domEventName);
       }
     }
 
     var isCapturePhaseListener = false;
+    // getEventListenerSet()获取事件监听组
     var listenerSet = getEventListenerSet(targetElement);
+    //getListenerSetKey: return domEventName + "__" + (capture ? 'capture' : 'bubble');
     var listenerSetKey = getListenerSetKey(domEventName, isCapturePhaseListener);
 
+    // 判断事件监听组是否存在这个事件
     if (!listenerSet.has(listenerSetKey)) {
+      // 如果进入了该if,说明不存在该事件,那么进行添加
       addTrappedEventListener(targetElement, domEventName, IS_NON_DELEGATED, isCapturePhaseListener);
+      // 添加进事件监听组
       listenerSet.add(listenerSetKey);
     }
   }
@@ -9751,19 +9762,24 @@
   }
 
   function createElement(type, props, rootContainerElement, parentNamespace) {
+    // 是否是自定义组件标签
     var isCustomComponentTag; // We create tags in the namespace of their parent container, except HTML
     // tags get no namespace.
 
+    //获取 document 对象
+    // getOwnerDocumentFromRootContainer()获取获取根节点的document对象
     var ownerDocument = getOwnerDocumentFromRootContainer(rootContainerElement);
     var domElement;
     var namespaceURI = parentNamespace;
 
     if (namespaceURI === HTML_NAMESPACE) {
+      //根据 DOM 实例的标签获取相应的命名空间
       namespaceURI = getIntrinsicNamespace(type);
     }
 
     if (namespaceURI === HTML_NAMESPACE) {
       {
+        // isCustomComponent()判断tagName是否包含'-',以此判断是否是自定义组件
         isCustomComponentTag = isCustomComponent(type, props); // Should this check be gated by parent namespace? Not sure we want to
         // allow <SVG> or <mATH>.
 
@@ -9775,6 +9791,9 @@
       if (type === 'script') {
         // Create the script via .innerHTML so its "parser-inserted" flag is
         // set to true and it does not execute
+
+        //parser-inserted 设置为 true 表示浏览器已经处理了该`<script>`标签
+        //那么该标签就不会被当做脚本执行
         var div = ownerDocument.createElement('div');
 
         div.innerHTML = '<script><' + '/script>'; // eslint-disable-line
@@ -9782,6 +9801,7 @@
 
         var firstChild = div.firstChild;
         domElement = div.removeChild(firstChild);
+      //如果需要更新的 props里有 is 属性的话，那么创建该元素时，则为它添加「is」attribute
       } else if (typeof props.is === 'string') {
         // $FlowIssue `createElement` should be updated for Web Components
         domElement = ownerDocument.createElement(type, {
@@ -9791,6 +9811,8 @@
         // Separate else branch instead of using `props.is || undefined` above because of a Firefox bug.
         // See discussion in https://github.com/facebook/react/pull/6896
         // and discussion in https://bugzilla.mozilla.org/show_bug.cgi?id=1276240
+
+        //因为 Firefox 的一个 bug，所以需要特殊处理「is」属性
         domElement = ownerDocument.createElement(type); // Normally attributes are assigned in `setInitialDOMProperties`, however the `multiple` and `size`
         // attributes on `select`s needs to be added before `option`s are inserted.
         // This prevents:
@@ -9800,6 +9822,7 @@
         // See https://github.com/facebook/react/issues/13222
         // and https://github.com/facebook/react/issues/14239
 
+        //<select>标签需要在<option>子节点被插入之前，设置`multiple`和`size`属性
         if (type === 'select') {
           var node = domElement;
 
@@ -9814,6 +9837,7 @@
           }
         }
       }
+    //svg/math 的元素创建是需要指定命名空间 URI 的
     } else {
       domElement = ownerDocument.createElementNS(namespaceURI, type);
     }
@@ -9833,7 +9857,10 @@
   function createTextNode(text, rootContainerElement) {
     return getOwnerDocumentFromRootContainer(rootContainerElement).createTextNode(text);
   }
+
+  // 初始化DOM对象
   function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
+    // 判断是否是自定义组件标签
     var isCustomComponentTag = isCustomComponent(tag, rawProps);
 
     {
@@ -9845,6 +9872,9 @@
 
     switch (tag) {
       case 'dialog':
+        // listenToNonDelegatedEvent()对该事件进行判断,是否存在该事件,如果不存在就进行添加
+        // 如果存在就不管
+        // 内部会判断是否属于非官方授权事件集中的
         listenToNonDelegatedEvent('cancel', domElement);
         listenToNonDelegatedEvent('close', domElement);
         props = rawProps;
@@ -9863,7 +9893,11 @@
       case 'audio':
         // We listen to these events in case to ensure emulated bubble
         // listeners still fire for all the media events.
+
+        // var mediaEventTypes = ['abort', 'canplay', 'canplaythrough', 'durationchange', 'emptied', 'encrypted', 'ended', 'error', 'loadeddata', 'loadedmetadata',
+        //  'loadstart', 'pause', 'play', 'playing', 'progress', 'ratechange', 'resize', 'seeked', 'seeking', 'stalled', 'suspend', 'timeupdate', 'volumechange', 'waiting'];
         for (var i = 0; i < mediaEventTypes.length; i++) {
+          // mediaEventTypes内的事件依次进入listenToNonDelegatedEvent()
           listenToNonDelegatedEvent(mediaEventTypes[i], domElement);
         }
 
@@ -9871,8 +9905,7 @@
         break;
 
       case 'source':
-        // We listen to this event in case to ensure emulated bubble
-        // listeners still fire for the error event.
+        //error listener
         listenToNonDelegatedEvent('error', domElement);
         props = rawProps;
         break;
@@ -9880,9 +9913,9 @@
       case 'img':
       case 'image':
       case 'link':
-        // We listen to these events in case to ensure emulated bubble
-        // listeners still fire for error and load events.
+        //error listener
         listenToNonDelegatedEvent('error', domElement);
+        //load listener
         listenToNonDelegatedEvent('load', domElement);
         props = rawProps;
         break;
@@ -9895,7 +9928,9 @@
         break;
 
       case 'input':
+        // 初始化input,并且添加_wrapperState属性
         initWrapperState(domElement, rawProps);
+        //浅拷贝value/checked等属性
         props = getHostProps(domElement, rawProps); // We listen to this event in case to ensure emulated bubble
         // listeners still fire for the invalid event.
 
@@ -9903,11 +9938,20 @@
         break;
 
       case 'option':
+        // 对<option>标签进行一些常规判断
+        //1、判断<option>标签的子节点是否是 number/string
+        //2、判断是否正确设置defaultValue/value
         validateProps(domElement, rawProps);
         props = rawProps;
         break;
 
       case 'select':
+        // 添加属性
+        /*
+          _wrapperState = {
+            wasMultiple: !!props.multiple
+          };
+        */
         initWrapperState$1(domElement, rawProps);
         props = getHostProps$1(domElement, rawProps); // We listen to this event in case to ensure emulated bubble
         // listeners still fire for the invalid event.
@@ -9927,9 +9971,13 @@
         props = rawProps;
     }
 
+    //判断新属性，比如 style 是否正确赋值
     assertValidProps(tag, props);
+    //设置初始的 DOM 对象属性
     setInitialDOMProperties(tag, domElement, rootContainerElement, props, isCustomComponentTag);
 
+
+     //对特殊的 DOM 标签进行最后的处理
     switch (tag) {
       case 'input':
         // TODO: Make sure we check if this is still unmounted or do any clean
@@ -9955,7 +10003,7 @@
 
       default:
         if (typeof props.onClick === 'function') {
-          // TODO: This cast may not be sound for SVG, MathML or custom elements.
+          //初始化 onclick 事件，以便兼容Safari移动端
           trapClickOnNonInteractiveElement(domElement);
         }
 
@@ -10985,6 +11033,7 @@
     {
       // TODO: take namespace into account when validating.
       var hostContextDev = hostContext;
+
       validateDOMNesting(type, null, hostContextDev.ancestorInfo);
 
       if (typeof props.children === 'string' || typeof props.children === 'number') {
@@ -10993,25 +11042,37 @@
         validateDOMNesting(null, string, ownAncestorInfo);
       }
 
+      //确定该节点的命名空间
+      // 一般是HTML，http://www.w3.org/1999/xhtml
+      //svg，为 http://www.w3.org/2000/svg ，请参考：https://developer.mozilla.org/zh-CN/docs/Web/SVG
+      //MathML,为 http://www.w3.org/1998/Math/MathML，请参考：https://developer.mozilla.org/zh-CN/docs/Web/MathML
       parentNamespace = hostContextDev.namespace;
     }
 
+    // createElement创建DOM元素,这里的createElement是React自己的
     var domElement = createElement(type, props, rootContainerInstance, parentNamespace);
+    //创建指向 fiber 对象的属性，方便从DOM 实例上获取 fiber 对象
     precacheFiberNode(internalInstanceHandle, domElement);
+    //创建指向 props 的属性，方便从 DOM 实例上获取 props
     updateFiberProps(domElement, props);
     return domElement;
   }
   function appendInitialChild(parentInstance, child) {
+    // 就是调用appendChild()这个 `原生`API
     parentInstance.appendChild(child);
   }
   function finalizeInitialChildren(domElement, type, props, rootContainerInstance, hostContext) {
+    // 初始化DOM对象
+    // 1.对一些标签进行事件绑定/属性的特殊处理
+    // 2.对DOM内部属性进行初始化
     setInitialProperties(domElement, type, props, rootContainerInstance);
 
-    switch (type) {
+    switch (type /*type*/) {
       case 'button':
       case 'input':
       case 'select':
       case 'textarea':
+        // autoFocus就是一个html属性,判断该元素是否有这个属性
         return !!props.autoFocus;
 
       case 'img':
@@ -11554,6 +11615,15 @@
     delete node[internalEventHandlesSetKey];
   }
   function precacheFiberNode(hostInst, node) {
+    /*
+        const randomKey = Math.random()
+        转成 36 进制
+        .toString(36)
+        从index=2开始截取
+        .slice(2);
+
+        var internalInstanceKey = '__reactFiber$' + randomKey;
+    */
     node[internalInstanceKey] = hostInst;
   }
   function markContainerAsRoot(hostRoot, node) {
@@ -11688,6 +11758,14 @@
     return node[internalPropsKey] || null;
   }
   function updateFiberProps(node, props) {
+    /*
+      internalPropsKey是随机数
+      const randomKey = Math.random()
+      转成 36 进制
+      .toString(36)
+      从index=2开始截取
+      .slice(2);
+    */
     node[internalPropsKey] = props;
   }
   function getEventListenerSet(node) {

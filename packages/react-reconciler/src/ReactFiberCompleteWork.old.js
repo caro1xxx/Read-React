@@ -220,29 +220,41 @@ if (supportsMutation) {
   ) {
     // We only have the top Fiber that was created but we need recurse down its
     // children to find all the terminal nodes.
+
+    //获取该节点的第一个子节点
     let node = workInProgress.child;
+    // 当该节点有子节点时
     while (node !== null) {
+      //如果是原生节点或 text 节点的话
       if (node.tag === HostComponent || node.tag === HostText) {
+        //将node.stateNode挂载到 parent 上
         appendInitialChild(parent, node.stateNode);
       } else if (node.tag === HostPortal) {
         // If we have a portal child, then we don't want to traverse
         // down its children. Instead, we'll get insertions from each child in
         // the portal directly.
+      // 如果存在子节点
       } else if (node.child !== null) {
+        //将当前节点的子节点的父节点 指向当前节点
         node.child.return = node;
+        //一直循环，设置return 属性，直到没有子节点
         node = node.child;
         continue;
       }
       if (node === workInProgress) {
         return;
       }
+      // 不存在兄弟节点
       while (node.sibling === null) {
         if (node.return === null || node.return === workInProgress) {
           return;
         }
+        // 将当前节点的直接父节点
         node = node.return;
       }
+      //将当前节点的兄弟节点的父节点 指向当前节点的父节点
       node.sibling.return = node.return;
+      //遍历兄弟节点
       node = node.sibling;
     }
   };
@@ -1091,8 +1103,8 @@ function completeWork(
           // (eg DOM renderer supports auto-focus for certain elements).
           // Make sure such renderers get scheduled for later work.
 
-          // 与update逻辑中的updateHostComponent类似的处理props的过程
-          // 相当于处理props
+          // 初始化DOM对象的事件监听器和内部属性
+          // 返回autoFocus属性的布尔值
           if (
             finalizeInitialChildren(
               instance,
