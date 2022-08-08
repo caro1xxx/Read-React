@@ -608,7 +608,7 @@ export function setInitialProperties(
 }
 
 // Calculate the diff between the two objects.
-export function diffProperties(
+export (
   domElement: Element,
   tag: string,
   lastRawProps: Object,

@@ -261,9 +261,9 @@ if (supportsMutation) {
     // If we have an alternate, that means this is an update and we need to
     // schedule a side-effect to do the updates.
 
-    // 获取已经记录的props
+    // 获取已经记录的旧props
     const oldProps = current.memoizedProps;
-    // 如果新旧props一直,则退出
+    // 如果新旧props一致,则退出
     if (oldProps === newProps) {
       // In mutation mode, this is sufficient for a bailout because
       // we won't touch this node even if children changed.
@@ -281,6 +281,8 @@ if (supportsMutation) {
     // TODO: Experiencing an error where oldProps is null. Suggests a host
     // component is hitting the resume path. Figure out why. Possibly
     // related to `hidden`.
+
+    //比较更新得出需要更新的 props 的集合：updatepayload:Array
     const updatePayload = prepareUpdate(
       instance,
       type,
@@ -294,6 +296,9 @@ if (supportsMutation) {
     workInProgress.updateQueue = (updatePayload: any);
     // If the update payload indicates that there is a change or if there
     // is a new ref we mark this as an update. All the work is done in commitWork.
+
+    //updatePayload有可能是个空数组
+    //注意：即使是空数组也会加上 Update 的 EffectTag
     if (updatePayload) {
       markUpdate(workInProgress);
     }
@@ -779,6 +784,7 @@ function bubbleProperties(completedWork: Fiber) {
 
   completedWork.childLanes = newChildLanes;
 
+  // return 一个boolean值
   return didBailout;
 }
 
@@ -884,18 +890,27 @@ function completeWork(
 
   popTreeContext(workInProgress);
   switch (workInProgress.tag) {
+    //组件的初始状态
     case IndeterminateComponent:
+    // 懒加载组件
     case LazyComponent:
+    //和 React.memo 类似
     case SimpleMemoComponent:
+    //函数组件
     case FunctionComponent:
     case ForwardRef:
+    // Fragment
     case Fragment:
     case Mode:
+    //Profiler 组件的更新
     case Profiler:
+    //Context.Consumer 组件的更新
     case ContextConsumer:
+    //React.Memo 组件的更新
     case MemoComponent:
       bubbleProperties(workInProgress);
       return null;
+    // 类组件
     case ClassComponent: {
       const Component = workInProgress.type;
       if (isLegacyContextProvider(Component)) {
@@ -904,6 +919,7 @@ function completeWork(
       bubbleProperties(workInProgress);
       return null;
     }
+    //fiberRoot 节点的更新
     case HostRoot: {
       const fiberRoot = (workInProgress.stateNode: FiberRoot);
 
@@ -917,16 +933,20 @@ function completeWork(
         }
       }
 
+      // 是否开启缓存
       if (enableCache) {
         let previousCache: Cache | null = null;
+        // 当前节点存在,获取当前节点的缓存
         if (current !== null) {
           previousCache = current.memoizedState.cache;
         }
         const cache: Cache = workInProgress.memoizedState.cache;
+        // 如果当前节点的缓存和之前的缓存不一致
         if (cache !== previousCache) {
           // Run passive effects to retain/release the cache.
           workInProgress.flags |= Passive;
         }
+        // 从valueCursor弹出之前的缓存
         popCacheProvider(workInProgress, cache);
       }
 
@@ -935,9 +955,12 @@ function completeWork(
       }
 
       popRootTransition(workInProgress, fiberRoot, renderLanes);
+      //将 valueStack 栈中指定位置的 value 赋值给不同 StackCursor.current
       popHostContainer(workInProgress);
+      //同上
       popTopLevelLegacyContextObject(workInProgress);
       resetMutableSourceWorkInProgressVersions();
+      // context 相关，可跳过
       if (fiberRoot.pendingContext) {
         fiberRoot.context = fiberRoot.pendingContext;
         fiberRoot.pendingContext = null;
@@ -987,13 +1010,16 @@ function completeWork(
       }
       return null;
     }
+    //DOM 节点的更新，涉及到 virtual dom
     case HostComponent: {
       popHostContext(workInProgress);
       const rootContainerInstance = getRootHostContainer();
+      //获取节点对应的fiber type 如<div> 对应fiber对象 div
       const type = workInProgress.type;
       // current !== null说明是更新
       // 针对HostComponent,还需要判断Fiber节点是否存在对应的DOM节点
       if (current !== null && workInProgress.stateNode != null) {
+        //更新 DOM 时进行 diff 判断
         updateHostComponent(
           current,
           workInProgress,
@@ -1002,11 +1028,14 @@ function completeWork(
           rootContainerInstance,
         );
 
+        //ref指向有变动的话，更新 ref
         if (current.ref !== workInProgress.ref) {
+          //添加 Ref 的 EffectTag
           markRef(workInProgress);
         }
       // 反之就是挂载
       } else {
+        // 不存在新props说明不是更新,并且初始化也没有携带props
         if (!newProps) {
           if (workInProgress.stateNode === null) {
             throw new Error(
@@ -1027,6 +1056,7 @@ function completeWork(
         // or completeWork depending on whether we want to add them top->down or
         // bottom->up. Top->down is faster in IE11.
         const wasHydrated = popHydrationState(workInProgress);
+        // 如果是服务端渲染
         if (wasHydrated) {
           // TODO: Move this and createInstance step into the beginPhase
           // to consolidate.
@@ -1041,6 +1071,7 @@ function completeWork(
             // commit-phase we mark this as such.
             markUpdate(workInProgress);
           }
+        // 客服端渲染
         } else {
           // // 为fiber创建对应DOM节点
           const instance = createInstance(
@@ -1071,12 +1102,15 @@ function completeWork(
               currentHostContext,
             )
           ) {
+            //添加 EffectTag，方便在 commit 阶段 update
             markUpdate(workInProgress);
           }
         }
-
+        //如果 ref 引用不为空的话
         if (workInProgress.ref !== null) {
           // If there is a ref on a host node we need to schedule a callback
+
+          //添加 Ref 的 EffectTag
           markRef(workInProgress);
         }
       }
@@ -1084,15 +1118,24 @@ function completeWork(
       bubbleProperties(workInProgress);
       return null;
     }
+    //文本节点的更新
     case HostText: {
       const newText = newProps;
+      // 如果不是第一次渲染
       if (current && workInProgress.stateNode != null) {
+        // 获取缓存的props
         const oldText = current.memoizedProps;
         // If we have an alternate, that means this is an update and we need
         // to schedule a side-effect to do the updates.
+
+        //如果与workInProgress相对于的alternate存在的话，说明有更新
+        //那么就添加 Update 的 effectTag
         updateHostText(current, workInProgress, oldText, newText);
+      // 反之第一次渲染
       } else {
+        // 如果text不是字符串
         if (typeof newText !== 'string') {
+          // 没有对应的真实节点
           if (workInProgress.stateNode === null) {
             throw new Error(
               'We must have new props for new mounts. This error is likely ' +
@@ -1109,6 +1152,7 @@ function completeWork(
             markUpdate(workInProgress);
           }
         } else {
+          // 创建文本节点
           workInProgress.stateNode = createTextInstance(
             newText,
             rootContainerInstance,
@@ -1120,6 +1164,7 @@ function completeWork(
       bubbleProperties(workInProgress);
       return null;
     }
+    // suspense组件更新
     case SuspenseComponent: {
       popSuspenseHandler(workInProgress);
       const nextState: null | SuspenseState = workInProgress.memoizedState;
@@ -1283,6 +1328,7 @@ function completeWork(
       }
       return null;
     }
+    //React.createportal 节点的更新
     case HostPortal:
       popHostContainer(workInProgress);
       updateHostContainer(current, workInProgress);
@@ -1291,12 +1337,14 @@ function completeWork(
       }
       bubbleProperties(workInProgress);
       return null;
+    //Context.Provider 组件的更新
     case ContextProvider:
       // Pop provider fiber
       const context: ReactContext<any> = workInProgress.type._context;
       popProvider(context, workInProgress);
       bubbleProperties(workInProgress);
       return null;
+    //未完成/被中断的 class 组件的更新
     case IncompleteClassComponent: {
       // Same as class component case. I put it down here so that the tags are
       // sequential to ensure this switch is compiled to a jump table.
@@ -1307,6 +1355,7 @@ function completeWork(
       bubbleProperties(workInProgress);
       return null;
     }
+    //SuspenseList 组件的更新
     case SuspenseListComponent: {
       popSuspenseListContext(workInProgress);
 

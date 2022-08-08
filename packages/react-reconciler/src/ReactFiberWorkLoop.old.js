@@ -2024,6 +2024,11 @@ function performUnitOfWork(unitOfWork: Fiber /*workInProgress */): void {
   ReactCurrentOwner.current = null;
 }
 
+/*
+  performUnitOfWork的作用:
+    完成当前节点的 work，然后移动到兄弟节点，重复该操作，
+    当没有更多兄弟节点时，返回至父节点
+*/
 function completeUnitOfWork(unitOfWork: Fiber): void {
   // 尝试完成当前单位的工作，然后转到下一个
   // 兄弟节点。如果没有更多的兄弟节点，则返回到父fiber。
@@ -2032,15 +2037,16 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
     // The current, flushed, state of this fiber is the alternate. Ideally
     // nothing should rely on this, but relying on it here means that we don't
     // need an additional field on the work in progress.
-    // 赋值alternate
+    // 获取备份节点中的当前节点
     const current = completedWork.alternate;
-    // 获取当前节点的父节点 return就是指向父节点的
+    // 获取父节点 return就是指向父节点的
     const returnFiber = completedWork.return;
 
     // Check if the work completed or if something threw.
 
     // Incomplete = 0b00000000001000000000000000;
     // 没有异常
+    // flags就是标记,类似lane,也是级别
     if ((completedWork.flags & Incomplete) === NoFlags) {
       setCurrentDebugFiberInDEV(completedWork);
       let next;
@@ -2050,12 +2056,13 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         !enableProfilerTimer ||
         (completedWork.mode & ProfileMode) === NoMode
       ) {
-         // 执行 completeWork
+        // 执行 completeWork
         next = completeWork(current, completedWork, renderLanes);
       } else {
       // 反之开启性能记录
         startProfilerTimer(completedWork);
         // 再执行completeWork
+        // 在执行完completeWork()后next就是更新完后的节点
         next = completeWork(current, completedWork, renderLanes);
         // Update render duration assuming we didn't error.
         stopProfilerTimerIfRunningAndRecordDelta(completedWork, false);
@@ -2066,16 +2073,17 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
       if (next !== null) {
         // Completing this fiber spawned new work. Work on that next.
 
-        // 这里我什么用next把原本的workInProgress覆盖了?????
+        // 将next替换旧的缓存树,以便后续更新
         workInProgress = next;
         return;
       }
-      // 若是该 fiber 节点未能完成 work 的话(异常)
+    // 若是该 fiber 节点未能完成 work 的话(异常)
     } else {
       // This fiber did not complete because something threw. Pop values off
       // the stack without entering the complete phase. If this is a boundary,
       // capture values if possible.
-      // 节点未能完成更新，捕获其中的错误
+
+      // 因为节点未能完成更新,我们需要找到其中的错误
       const next = unwindWork(current, completedWork, renderLanes);
 
       // Because this fiber did not complete, don't reset its lanes.
@@ -2086,13 +2094,15 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // back here again.
         // Since we're restarting, remove anything that is not a host effect
         // from the effect tag.
-        
+
         // HostEffectMask = 0b00000000000111111111111111
         next.flags &= HostEffectMask;
+        // 这里的逻辑和2076行一致,用新的替换旧的,就不需要return next出去了
         workInProgress = next;
         return;
       }
 
+      // 由于该 fiber 未能完成，所以不必重置它的 expirationTime
       if (
         enableProfilerTimer &&
         (completedWork.mode & ProfileMode) !== NoMode
@@ -2100,7 +2110,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // Record the render duration for the fiber that errored.
         stopProfilerTimerIfRunningAndRecordDelta(completedWork, false);
 
-        // Include the time spent working on failed children before continuing.
+        //虽然报错了，但仍然会累计 work 时长,但不重置expirationTime
         let actualDuration = completedWork.actualDuration;
         let child = completedWork.child;
         while (child !== null) {
@@ -2110,33 +2120,42 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         completedWork.actualDuration = actualDuration;
       }
 
+      // 如果父节点存在的话，标记为「未完成」,并清除子树标记
       if (returnFiber !== null) {
-        // Mark the parent fiber as incomplete and clear its subtree flags.
         returnFiber.flags |= Incomplete;
         returnFiber.subtreeFlags = NoFlags;
         returnFiber.deletions = null;
       } else {
         // We've unwound all the way to the root.
+
+        // workInProgressRootExitStatus是缓存树退出时标记的状态
+        // RootDidNotComplete = 6
         workInProgressRootExitStatus = RootDidNotComplete;
+        // 因为returnFiber不存在了,说明是root了,所以将缓存树清空,以便进行下一次更新
         workInProgress = null;
         return;
       }
     }
 
+    // 获取兄弟节点
     const siblingFiber = completedWork.sibling;
+    // 如果兄弟节点存在,那么将缓存树替换为siblingFiber
     if (siblingFiber !== null) {
       // If there is more work to do in this returnFiber, do that next.
       workInProgress = siblingFiber;
       return;
     }
-    // Otherwise, return to the parent
+    //如果能执行到这一步的话，说明 siblingFiber 为 null，
+    //那么就返回至父节点
     completedWork = returnFiber;
     // Update the next thing we're working on in case something throws.
     workInProgress = completedWork;
+    // 只要completedWork不为null,那么就会一直更新,直到更新完毕
   } while (completedWork !== null);
 
-  // We've reached the root.
+  // 走到这里说明已经执行到root了,判断缓存树退出状态是否RootInProgress(0)
   if (workInProgressRootExitStatus === RootInProgress) {
+    // 如果是那么标记退出状态为RootCompleted(5) 即[已完成]
     workInProgressRootExitStatus = RootCompleted;
   }
 }

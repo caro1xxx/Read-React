@@ -265,7 +265,7 @@ function clearNestedProperty(
  * If no updatePayload is provided, a new one is created and returned if
  * anything changed.
  */
-function diffProperties(
+(
   updatePayload: null | Object,
   prevProps: Object,
   nextProps: Object,
