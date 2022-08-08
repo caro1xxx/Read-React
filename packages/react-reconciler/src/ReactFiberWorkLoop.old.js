@@ -998,6 +998,7 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
     ? renderRootConcurrent(root, lanes)
   // performSyncWorkOnRoot 会调用该方法
     : renderRootSync(root, lanes);
+  
   if (exitStatus !== RootInProgress) {
     if (exitStatus === RootErrored) {
       // If something threw an error, try rendering one more time. We'll
@@ -1392,9 +1393,9 @@ function performSyncWorkOnRoot(root) {
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
   commitRoot(
-    root,
-    workInProgressRootRecoverableErrors,
-    workInProgressTransitions,
+    root, /**fiberRootNode */
+    workInProgressRootRecoverableErrors, /**null */
+    workInProgressTransitions, /**null */
   );
 
   // Before exiting, make sure there's a callback scheduled for the next
@@ -2132,6 +2133,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // RootDidNotComplete = 6
         workInProgressRootExitStatus = RootDidNotComplete;
         // 因为returnFiber不存在了,说明是root了,所以将缓存树清空,以便进行下一次更新
+        // 这里置为null的原因是,在workLoopSync()内while执行的条件是workInProgress !== null,那么置为null就结束while了
         workInProgress = null;
         return;
       }

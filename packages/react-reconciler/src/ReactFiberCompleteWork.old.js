@@ -1085,7 +1085,7 @@ function completeWork(
           }
         // 客服端渲染
         } else {
-          // // 为fiber创建对应DOM节点
+          // 为fiber创建对应DOM节点
           const instance = createInstance(
             type,
             newProps,
@@ -1094,7 +1094,7 @@ function completeWork(
             workInProgress,
           );
 
-          // 将子孙DOM节点插入上一步生成的DOM节点中
+          // 插入子节点
           appendAllChildren(instance, workInProgress, false, false);
           // DOM节点赋值给fiber.stateNode
           workInProgress.stateNode = instance;
