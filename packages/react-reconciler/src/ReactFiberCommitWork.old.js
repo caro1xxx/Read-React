@@ -1487,7 +1487,7 @@ function detachFiberAfterEffects(fiber: Fiber) {
       // 获取真实节点
       const hostInstance: Instance = fiber.stateNode;
       if (hostInstance !== null) {
-        // 执行清除真是节点方法
+        // 执行清除真实节点方法
         /*
           function detachDeletedInstance(node) {
             // TODO: This function is only called on host components. I don't think all of
