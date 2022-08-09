@@ -854,6 +854,11 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
     cancelCallback(existingCallbackNode);
   }
 
+  /*
+    不管是performSyncWorkOnRoot还是performConcurrentWorkOnRoot,
+    内部都有commit阶段,只是名称逻辑不一样
+  */
+
   // 调度一个新任务
   let newCallbackNode;
   // 如果当前调度的任务是是一个 Scheduler 任务而不是一个“act”任务，则退出，重新调度“act”的队列
@@ -1028,6 +1033,7 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
       // synchronous update. We should have already checked for this when we
       // unwound the stack.
       markRootSuspended(root, lanes);
+    // 渲染完成进入
     } else {
       // The render completed.
 
@@ -1038,15 +1044,17 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
       // skip the consistency check in that case, too.
       const renderWasConcurrent = !includesBlockingLane(root, lanes);
       const finishedWork: Fiber = (root.current.alternate: any);
+
       if (
         renderWasConcurrent &&
+        // isRenderConsistentWithExternalStores()就是判断store状态是否一致
+        // Concurrent模式下,需要进行 store 的一致性检查
         !isRenderConsistentWithExternalStores(finishedWork)
       ) {
-        // A store was mutated in an interleaved event. Render again,
-        // synchronously, to block further mutations.
+        // 如果Concurrent模式下,store状态不一致,那么进行同步渲染
         exitStatus = renderRootSync(root, lanes);
 
-        // We need to check again if something threw
+        // 再次判断是否渲染完成
         if (exitStatus === RootErrored) {
           const errorRetryLanes = getLanesToRetrySynchronouslyOnError(root);
           if (errorRetryLanes !== NoLanes) {
@@ -1056,6 +1064,7 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
             // concurrent events.
           }
         }
+        // 判断退出状态
         if (exitStatus === RootFatalErrored) {
           const fatalError = workInProgressRootFatalError;
           prepareFreshStack(root, NoLanes);
@@ -1065,10 +1074,10 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
         }
       }
 
-      // We now have a consistent tree. The next step is either to commit it,
-      // or, if something suspended, wait to commit it after a timeout.
+      // 我们现在有一个一致的树。下一步是提交，或者，如果有事情暂停，则等待超时后再提交。
       root.finishedWork = finishedWork;
       root.finishedLanes = lanes;
+      // Concurrent模式下调用的commit
       finishConcurrentRender(root, exitStatus, lanes);
     }
   }
@@ -1140,6 +1149,7 @@ export function queueRecoverableErrors(errors: Array<CapturedValue<mixed>>) {
 }
 
 function finishConcurrentRender(root, exitStatus, lanes) {
+  // 更新退出状态判断
   switch (exitStatus) {
     case RootInProgress:
     case RootFatalErrored: {
@@ -1148,6 +1158,8 @@ function finishConcurrentRender(root, exitStatus, lanes) {
     // Flow knows about invariant, so it complains if I add a break
     // statement, but eslint doesn't know about invariant, so it complains
     // if I do. eslint-disable-next-line no-fallthrough
+
+    // 因为这里已经重试过了,但是还是渲染出错了,最终还是commit
     case RootErrored: {
       // We should have already attempted to retry this tree. If we reached
       // this point, it errored again. Commit it.
@@ -1277,12 +1289,14 @@ function finishConcurrentRender(root, exitStatus, lanes) {
   }
 }
 
+// 判断渲染与外部存储是否一致
 function isRenderConsistentWithExternalStores(finishedWork: Fiber): boolean {
   // Search the rendered tree for external store reads, and check whether the
   // stores were mutated in a concurrent event. Intentionally using an iterative
   // loop instead of recursion so we can exit early.
   let node: Fiber = finishedWork;
   while (true) {
+    // export const StoreConsistency = /*             */ 0b00000000000100000000000000;
     if (node.flags & StoreConsistency) {
       const updateQueue: FunctionComponentUpdateQueue | null = (node.updateQueue: any);
       if (updateQueue !== null) {
@@ -1392,6 +1406,7 @@ function performSyncWorkOnRoot(root) {
   const finishedWork: Fiber = (root.current.alternate: any);
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
+  // Sync模式下的进入的commit
   commitRoot(
     root, /**fiberRootNode */
     workInProgressRootRecoverableErrors, /**null */
@@ -2169,11 +2184,14 @@ function commitRoot(
 ) {
   // TODO: This no longer makes any sense. We already wrap the mutation and
   // layout phases. Should be able to remove.
+
+  // 保存当前更新优先级
   const previousUpdateLanePriority = getCurrentUpdatePriority();
   const prevTransition = ReactCurrentBatchConfig.transition;
 
   try {
     ReactCurrentBatchConfig.transition = null;
+    // 将当前优先级设为离散,为同步优先级,不可被打断
     setCurrentUpdatePriority(DiscreteEventPriority);
     commitRootImpl(
       root,
@@ -2182,7 +2200,9 @@ function commitRoot(
       previousUpdateLanePriority,
     );
   } finally {
+    // 恢复transition
     ReactCurrentBatchConfig.transition = prevTransition;
+    // 恢复优先级
     setCurrentUpdatePriority(previousUpdateLanePriority);
   }
 
@@ -2287,11 +2307,14 @@ function commitRootImpl(
   // might get scheduled in the commit phase. (See #16714.)
   // TODO: Delete all other places that schedule the passive effect callback
   // They're redundant.
+
+  // 如果flags/subtreeFlags中存在PassiveMask,即Passive|ChildDeletion
   if (
     (finishedWork.subtreeFlags & PassiveMask) !== NoFlags ||
     (finishedWork.flags & PassiveMask) !== NoFlags
   ) {
     if (!rootDoesHavePassiveEffects) {
+      // 也就是说如果使用了useEffect或者是节点有删除的情况
       rootDoesHavePassiveEffects = true;
       pendingPassiveEffectsRemainingLanes = remainingLanes;
       // workInProgressTransitions might be overwritten, so we want
@@ -2302,6 +2325,7 @@ function commitRootImpl(
       // with setTimeout
       pendingPassiveTransitions = transitions;
       scheduleCallback(NormalSchedulerPriority, () => {
+        // 执行flushPassiveEffects()
         flushPassiveEffects();
         // This render triggered passive effects: release the root cache pool
         // *after* passive effects fire to avoid freeing a cache pool that may
@@ -2425,10 +2449,14 @@ function commitRootImpl(
 
   const rootDidHavePassiveEffects = rootDoesHavePassiveEffects;
 
+
+  // 在前面rootDoesHavePassiveEffects被置为true,这里成立
   if (rootDoesHavePassiveEffects) {
     // This commit has passive effects. Stash a reference to them. But don't
     // schedule a callback until after flushing layout work.
+    // 又置为false
     rootDoesHavePassiveEffects = false;
+    //赋值rootWithPendingPassiveEffects,那么下次执行该函数时在该函数开头的do while就可以执行了
     rootWithPendingPassiveEffects = root;
     pendingPassiveEffectsLanes = lanes;
   } else {
@@ -2573,6 +2601,9 @@ export function flushPassiveEffects(): boolean {
   // in the first place because we used to wrap it with
   // `Scheduler.runWithPriority`, which accepts a function. But now we track the
   // priority within React itself, so we can mutate the variable directly.
+  
+  // 如果 rootWithPendingPassiveEffects 存在，说明
+  // 使用了 useEffect 或者有子节点被删除
   if (rootWithPendingPassiveEffects !== null) {
     // Cache the root since rootWithPendingPassiveEffects is cleared in
     // flushPassiveEffectsImpl
@@ -2583,17 +2614,25 @@ export function flushPassiveEffects(): boolean {
     const remainingLanes = pendingPassiveEffectsRemainingLanes;
     pendingPassiveEffectsRemainingLanes = NoLanes;
 
+    // 将lane转换为事件优先级
     const renderPriority = lanesToEventPriority(pendingPassiveEffectsLanes);
+    // 取得最低事件优先级
     const priority = lowerEventPriority(DefaultEventPriority, renderPriority);
+    // 保存transition
     const prevTransition = ReactCurrentBatchConfig.transition;
+    // 保存当前更新优先级
     const previousPriority = getCurrentUpdatePriority();
 
     try {
       ReactCurrentBatchConfig.transition = null;
+      // 设置当前更新优先级会获取的最低事件优先级
       setCurrentUpdatePriority(priority);
+      // 进入flushPassiveEffectsImpl()
       return flushPassiveEffectsImpl();
     } finally {
+      // 恢复优先级
       setCurrentUpdatePriority(previousPriority);
+      // 恢复transition
       ReactCurrentBatchConfig.transition = prevTransition;
 
       // Once passive effects have run for the tree - giving components a
@@ -2623,7 +2662,7 @@ function flushPassiveEffectsImpl() {
     return false;
   }
 
-  // Cache and clear the transitions flag
+  // 缓存并清除过渡标志
   const transitions = pendingPassiveTransitions;
   pendingPassiveTransitions = null;
 
@@ -2655,7 +2694,12 @@ function flushPassiveEffectsImpl() {
   const prevExecutionContext = executionContext;
   executionContext |= CommitContext;
 
+  // 从下到 sibling 到 return 这种深度遍历的方式，一次执行 effect 的 destroy 方法
+  // commitPassiveUnmountEffects实际调用的是recursivelyTraversePassiveUnmountEffects
+  // 方法，该方法首先会向下遍历，对于有ChildDeletion标记的都会遍历fiber.deletions（记
+  // 录了需要删除的老fiber）执行真实节点的删除
   commitPassiveUnmountEffects(root.current);
+  // 遍历 root.current 的 updateQueue，执行上面的 effect 的 create 方法
   commitPassiveMountEffects(root, root.current, lanes, transitions);
 
   // TODO: Move to commitPassiveMountEffects

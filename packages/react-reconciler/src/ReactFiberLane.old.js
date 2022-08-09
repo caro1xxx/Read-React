@@ -500,7 +500,10 @@ export function includesOnlyTransitions(lanes: Lanes) {
   return (lanes & TransitionLanes) === lanes;
 }
 
+// 判断传入的lane是否包含在指定lane中
 export function includesBlockingLane(root: FiberRoot, lanes: Lanes) {
+  // 注意这里默认是不会命中的，很多博客都说这里是默认开启，实际是不是的。并且这一个
+  // 判断在 react 打包后就不会存在了。
   if (
     allowConcurrentByDefault &&
     (root.current.mode & ConcurrentUpdatesByDefaultMode) !== NoMode
@@ -508,6 +511,7 @@ export function includesBlockingLane(root: FiberRoot, lanes: Lanes) {
     // Concurrent updates by default always use time slicing.
     return false;
   }
+  // 如果当前任务 lane 在这几个 lanes 中，则返回 true，反之就为 false，则不会开启时间切片
   const SyncDefaultLanes =
     InputContinuousHydrationLane |
     InputContinuousLane |
