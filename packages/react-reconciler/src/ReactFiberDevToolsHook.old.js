@@ -188,8 +188,9 @@ export function onPostCommitRoot(root: FiberRoot) {
 }
 
 export function onCommitUnmount(fiber: Fiber) {
-  if (injectedHook && typeof injectedHook.onCommitFiberUnmount === 'function') {
+  if (injectedHook /*null */ && typeof injectedHook.onCommitFiberUnmount === 'function') {
     try {
+      // 执行Unmount钩子
       injectedHook.onCommitFiberUnmount(rendererID, fiber);
     } catch (err) {
       if (__DEV__) {

@@ -6409,6 +6409,7 @@
     _enabled = !!enabled;
   }
   function isEnabled() {
+    // _enabled = true
     return _enabled;
   }
   function createEventListenerWrapperWithPriority(targetContainer, domEventName, eventSystemFlags) {
@@ -11014,6 +11015,7 @@
     return instance;
   }
   function prepareForCommit(containerInfo) {
+    //isEnabled()返回true
     eventsEnabled = isEnabled();
     selectionInformation = getSelectionInformation();
     var activeInstance = null;

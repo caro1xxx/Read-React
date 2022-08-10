@@ -2192,6 +2192,7 @@ function commitRoot(
   try {
     ReactCurrentBatchConfig.transition = null;
     // 将当前优先级设为离散,为同步优先级,不可被打断
+    // 并且DiscreteEventPriority是最高优先级任务
     setCurrentUpdatePriority(DiscreteEventPriority);
     commitRootImpl(
       root,
@@ -2215,6 +2216,8 @@ function commitRootImpl(
   transitions: Array<Transition> | null,
   renderPriorityLevel: EventPriority,
 ) {
+  // 采用 do while 的作用是，在 useEffect 内部
+  // 可能会触发新的更新，新的更新可能会触发新的副作用 ，因此需要不断的循环，直到 为 null
   //这一步是为了看看还有没有没有执行的 useEffect， 有的话先执行他们
   do {
     // `flushPassiveEffects` will call `flushSyncUpdateQueue` at the end, which
@@ -2227,22 +2230,12 @@ function commitRootImpl(
   } while (rootWithPendingPassiveEffects !== null);
   flushRenderPhaseStrictModeWarningsInDEV();
 
-  if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
-    throw new Error('Should not already be working.');
-  }
 
+  // 当前的 rootFiber
   const finishedWork = root.finishedWork;
+  // 优先级相关
   const lanes = root.finishedLanes;
 
-  if (__DEV__) {
-    if (enableDebugTracing) {
-      logCommitStarted(lanes);
-    }
-  }
-
-  if (enableSchedulingProfiler) {
-    markCommitStarted(lanes);
-  }
 
   if (finishedWork === null) {
     if (__DEV__) {
@@ -2256,16 +2249,8 @@ function commitRootImpl(
     }
 
     return null;
-  } else {
-    if (__DEV__) {
-      if (lanes === NoLanes) {
-        console.error(
-          'root.finishedLanes should not be empty during a commit. This is a ' +
-            'bug in React.',
-        );
-      }
-    }
   }
+
   root.finishedWork = null;
   root.finishedLanes = NoLanes;
 
@@ -2278,11 +2263,12 @@ function commitRootImpl(
 
   // commitRoot never returns a continuation; it always finishes synchronously.
   // So we can clear these now to allow a new callback to be scheduled.
+
+  // 绑定 scheduler 的回调函数
   root.callbackNode = null;
   root.callbackPriority = NoLane;
 
-  // Check which lanes no longer have any work scheduled on them, and mark
-  // those as finished.
+  // 检查哪些车道上不再有任何工作安排，并将这些车道标记为已完成
   let remainingLanes = mergeLanes(finishedWork.lanes, finishedWork.childLanes);
 
   // Make sure to account for lanes that were updated by a concurrent event
@@ -2291,6 +2277,8 @@ function commitRootImpl(
   remainingLanes = mergeLanes(remainingLanes, concurrentlyUpdatedLanes);
 
   markRootFinished(root, remainingLanes);
+
+  // 处理光标，重置一些 render 阶段使用的变量
 
   if (root === workInProgressRoot) {
     // We can reset these now that they are finished.
@@ -2310,6 +2298,7 @@ function commitRootImpl(
   // They're redundant.
 
   // 如果flags/subtreeFlags中存在PassiveMask,即Passive|ChildDeletion
+  // 就是 调度 useEffect
   if (
     (finishedWork.subtreeFlags & PassiveMask) !== NoFlags ||
     (finishedWork.flags & PassiveMask) !== NoFlags
@@ -2326,7 +2315,7 @@ function commitRootImpl(
       // with setTimeout
       pendingPassiveTransitions = transitions;
       scheduleCallback(NormalSchedulerPriority, () => {
-        // 执行flushPassiveEffects()
+        // 执行flushPassiveEffects() 就是触发 useEffect
         flushPassiveEffects();
         // This render triggered passive effects: release the root cache pool
         // *after* passive effects fire to avoid freeing a cache pool that may
@@ -2341,6 +2330,8 @@ function commitRootImpl(
   // to check for the existence of `firstEffect` to satisfy Flow. I think the
   // only other reason this optimization exists is because it affects profiling.
   // Reconsider whether this is necessary.
+
+  // 子树是否有更新
   const subtreeHasEffects =
     (finishedWork.subtreeFlags &
       (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
@@ -2351,6 +2342,7 @@ function commitRootImpl(
     NoFlags;
 
   if (subtreeHasEffects || rootHasEffect) {
+    // 存在副作用，处理 Fiber 上的副作用
     const prevTransition = ReactCurrentBatchConfig.transition;
     ReactCurrentBatchConfig.transition = null;
     const previousPriority = getCurrentUpdatePriority();
@@ -2359,7 +2351,7 @@ function commitRootImpl(
     const prevExecutionContext = executionContext;
     executionContext |= CommitContext;
 
-    // Reset this to null before calling lifecycles
+    // 在调用生命周期之前，将其重置为空
     ReactCurrentOwner.current = null;
 
     // The commit phase is broken into several sub-phases. We do a separate pass
@@ -2369,24 +2361,26 @@ function commitRootImpl(
     // The first phase a "before mutation" phase. We use this phase to read the
     // state of the host tree right before we mutate it. This is where
     // getSnapshotBeforeUpdate is called.
+
+    /**
+     * before mutation阶段
+     */
+
+
+    // 第一个阶段是 before mutation ，在这个阶段可以读取改变之前的的 state
+    // 生命周期函数 getSnapshotBeforeUpdate 的调用
     const shouldFireAfterActiveInstanceBlur = commitBeforeMutationEffects(
       root,
       finishedWork,
     );
 
-    if (enableProfilerTimer) {
-      // Mark the current commit time to be shared by all Profilers in this
-      // batch. This enables them to be grouped later.
-      recordCommitTime();
-    }
 
-    if (enableProfilerTimer && enableProfilerNestedUpdateScheduledHook) {
-      // Track the root here, rather than in commitLayoutEffects(), because of ref setters.
-      // Updates scheduled during ref detachment should also be flagged.
-      rootCommittingMutationOrLayoutEffects = root;
-    }
+    /**
+     * mutation阶段
+     */
 
-    // The next phase is the mutation phase, where we mutate the host tree.
+    //  mutation 阶段，可以在这个阶段 改变 host tree
+    //  mutation 阶段并`不会`使用向下查找,向上归并的方式执行,而是直接执行commitMutationEffectsOnFiber函数
     commitMutationEffects(root, finishedWork, lanes);
 
     if (enableCreateEventHandleAPI) {
@@ -2400,41 +2394,41 @@ function commitRootImpl(
     // the mutation phase, so that the previous tree is still current during
     // componentWillUnmount, but before the layout phase, so that the finished
     // work is current during componentDidMount/Update.
+
+
+    /**
+     * 重点:
+     *  root.current = finishedWork;
+     *  交换页面指向的树
+     */
+
+    /*
+      当 workInProgressFiber 树完成了渲染，就会将 current 指针
+      从 current Fiber 树指向 workInProgress Fiber 树，也就是这行代码所做的工作
+    */
+    // 交换 workInProgress
     root.current = finishedWork;
 
     // The next phase is the layout phase, where we call effects that read
     // the host tree after it's been mutated. The idiomatic use case for this is
     // layout, but class component lifecycles also fire here for legacy reasons.
-    if (__DEV__) {
-      if (enableDebugTracing) {
-        logLayoutEffectsStarted(lanes);
-      }
-    }
-    if (enableSchedulingProfiler) {
-      markLayoutEffectsStarted(lanes);
-    }
+
+
+    /**
+     * layout阶段
+     */
+
+    // 执行 layout
     commitLayoutEffects(finishedWork, root, lanes);
-    if (__DEV__) {
-      if (enableDebugTracing) {
-        logLayoutEffectsStopped();
-      }
-    }
-
-    if (enableSchedulingProfiler) {
-      markLayoutEffectsStopped();
-    }
-
-    if (enableProfilerTimer && enableProfilerNestedUpdateScheduledHook) {
-      rootCommittingMutationOrLayoutEffects = null;
-    }
 
     // Tell Scheduler to yield at the end of the frame, so the browser has an
     // opportunity to paint.
     requestPaint();
 
+    // 重置执行栈环境
     executionContext = prevExecutionContext;
 
-    // Reset the priority to the previous non-sync value.
+    // 将优先级重置为之前的 非同步优先级
     setCurrentUpdatePriority(previousPriority);
     ReactCurrentBatchConfig.transition = prevTransition;
   } else {
@@ -2464,10 +2458,6 @@ function commitRootImpl(
     // There were no passive effects, so we can immediately release the cache
     // pool for this render.
     releaseRootPooledCache(root, remainingLanes);
-    if (__DEV__) {
-      nestedPassiveUpdateCount = 0;
-      rootWithPassiveNestedUpdates = null;
-    }
   }
 
   // Read this again, since an effect might have updated it
@@ -2489,26 +2479,10 @@ function commitRootImpl(
     legacyErrorBoundariesThatAlreadyFailed = null;
   }
 
-  if (__DEV__ && enableStrictEffects) {
-    if (!rootDidHavePassiveEffects) {
-      commitDoubleInvokeEffectsInDEV(root.current, false);
-    }
-  }
-
   onCommitRootDevTools(finishedWork.stateNode, renderPriorityLevel);
 
-  if (enableUpdaterTracking) {
-    if (isDevToolsPresent) {
-      root.memoizedUpdaters.clear();
-    }
-  }
 
-  if (__DEV__) {
-    onCommitRootTestSelector();
-  }
-
-  // Always call this before exiting `commitRoot`, to ensure that any
-  // additional work on this root is scheduled.
+  // commit 阶段结尾，可能会在 commit 阶段产生新的更新，因此在 commit 阶段的结尾会重新调度一次
   ensureRootIsScheduled(root, now());
 
   if (recoverableErrors !== null) {
@@ -2564,18 +2538,10 @@ function commitRootImpl(
     nestedUpdateCount = 0;
   }
 
-  // If layout work was scheduled, flush it now.
+  // react 中会将同步任务放在 flushSync 队列中，执行这个函数会执行它里面的同步任务
+  // 默认 react 中开启的是 legacy 模式，这种模式下的更新都是 同步的 更新，
+  // 未来会开启 concurrent 模式（并发模式），会出现不同优先级的更新
   flushSyncCallbacks();
-
-  if (__DEV__) {
-    if (enableDebugTracing) {
-      logCommitStopped();
-    }
-  }
-
-  if (enableSchedulingProfiler) {
-    markCommitStopped();
-  }
 
   return null;
 }
