@@ -238,7 +238,7 @@ function safelyCallComponentWillUnmount(
   }
 }
 
-// Capture errors so they don't interrupt mounting.
+// 捕获错误，以便它们不会中断安装。
 function safelyAttachRef(current: Fiber, nearestMountedAncestor: Fiber | null) {
   try {
     commitAttachRef(current);
@@ -592,6 +592,7 @@ function commitHookEffectListUnmount(
 }
 
 function commitHookEffectListMount(flags: HookFlags, finishedWork: Fiber) {
+  // 获取队列
   const updateQueue: FunctionComponentUpdateQueue | null = (finishedWork.updateQueue: any);
   // 获取最后一个effect
   const lastEffect = updateQueue !== null ? updateQueue.lastEffect : null;
@@ -748,6 +749,7 @@ function commitHookLayoutEffects(finishedWork: Fiber, hookFlags: HookFlags) {
   ) {
     try {
       startLayoutEffectTimer();
+      // 获取effects中的每一个effect并执行create方法,就相当于挂载
       commitHookEffectListMount(hookFlags, finishedWork);
     } catch (error) {
       captureCommitPhaseError(finishedWork, finishedWork.return, error);
@@ -767,6 +769,7 @@ function commitClassLayoutLifecycles(
   current: Fiber | null,
 ) {
   const instance = finishedWork.stateNode;
+  // 如果current == nul 说明是挂载
   if (current === null) {
     // We could update instance props and state here,
     // but instead we rely on them being set during last render.
@@ -805,6 +808,7 @@ function commitClassLayoutLifecycles(
     ) {
       try {
         startLayoutEffectTimer();
+        // 执行生命周期DidMount();
         instance.componentDidMount();
       } catch (error) {
         captureCommitPhaseError(finishedWork, finishedWork.return, error);
@@ -812,11 +816,13 @@ function commitClassLayoutLifecycles(
       recordLayoutEffectDuration(finishedWork);
     } else {
       try {
+        // 执行生命周期DidMount();
         instance.componentDidMount();
       } catch (error) {
         captureCommitPhaseError(finishedWork, finishedWork.return, error);
       }
     }
+  // 反之解释更新
   } else {
     const prevProps =
       finishedWork.elementType === finishedWork.type
@@ -871,6 +877,7 @@ function commitClassLayoutLifecycles(
       recordLayoutEffectDuration(finishedWork);
     } else {
       try {
+        // 执行生命周期DidUpdate()
         instance.componentDidUpdate(
           prevProps,
           prevState,
@@ -932,6 +939,9 @@ function commitHostComponentMount(finishedWork: Fiber) {
   const props = finishedWork.memoizedProps;
   const instance: Instance = finishedWork.stateNode;
   try {
+    // 提交挂载
+    // 内部判断是否属于 button/input/select/textarea/中的type,
+    // 如果是的话就执行focus()聚焦
     commitMount(instance, type, props, finishedWork);
   } catch (error) {
     captureCommitPhaseError(finishedWork, finishedWork.return, error);
@@ -1015,41 +1025,54 @@ function commitLayoutEffectOnFiber(
     case FunctionComponent:
     case ForwardRef:
     case SimpleMemoComponent: {
+      // 递归的获取子节点
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
         committedLanes,
       );
       if (flags & Update) {
+        // 如果更新,执行
         commitHookLayoutEffects(finishedWork, HookLayout | HookHasEffect);
       }
       break;
     }
+    // 类组件的情况
     case ClassComponent: {
+      // 递归的获取子节点
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
         committedLanes,
       );
       if (flags & Update) {
+        // 内部就是判断是否是更新或者挂载,从而执行对应的hook
         commitClassLayoutLifecycles(finishedWork, current);
       }
 
+      // 判断是否有callback
       if (flags & Callback) {
+        // 执行callback
         commitClassCallbacks(finishedWork);
       }
 
       if (flags & Ref) {
+        // 作用:获取ref绑定的节点实例,如果ref是个函数那么指定 ref 的引用,否则仅将ref指向节点实例
         safelyAttachRef(finishedWork, finishedWork.return);
       }
       break;
     }
+    // 顶部节点情况
     case HostRoot: {
+      // 递归的获取子节点
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
         committedLanes,
       );
+      /*
+        判断callback,如果存在,那么从队列中获取执行
+      */
       if (flags & Callback) {
         // TODO: I think this is now always non-null by the time it reaches the
         // commit phase. Consider removing the type check.
@@ -1077,7 +1100,9 @@ function commitLayoutEffectOnFiber(
       }
       break;
     }
+    // 顶部组件情况
     case HostComponent: {
+      // 递归的获取子节点
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1089,15 +1114,19 @@ function commitLayoutEffectOnFiber(
       // These effects should only be committed when components are first mounted,
       // aka when there is no current/alternate.
       if (current === null && flags & Update) {
+        // 判断是否属于输入类型的组件,如果是就focus()聚焦
         commitHostComponentMount(finishedWork);
       }
 
+      // 执行ref
       if (flags & Ref) {
         safelyAttachRef(finishedWork, finishedWork.return);
       }
       break;
     }
+    // Profiler
     case Profiler: {
+      // 递归的获取子节点
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1367,9 +1396,11 @@ function hideOrUnhideAllChildren(finishedWork, isHidden) {
 
 function commitAttachRef(finishedWork: Fiber) {
   const ref = finishedWork.ref;
+  // ref存在
   if (ref !== null) {
     const instance = finishedWork.stateNode;
     let instanceToUse;
+    // 获取ref绑定的节点实例
     switch (finishedWork.tag) {
       case HostComponent:
         instanceToUse = getPublicInstance(instance);
@@ -1381,6 +1412,7 @@ function commitAttachRef(finishedWork: Fiber) {
     if (enableScopeAPI && finishedWork.tag === ScopeComponent) {
       instanceToUse = instance;
     }
+    // 如果ref是个函数
     if (typeof ref === 'function') {
       let retVal;
       if (
@@ -1390,11 +1422,13 @@ function commitAttachRef(finishedWork: Fiber) {
       ) {
         try {
           startLayoutEffectTimer();
+          //指定 ref 的引用
           retVal = ref(instanceToUse);
         } finally {
           recordLayoutEffectDuration(finishedWork);
         }
       } else {
+        //指定 ref 的引用
         retVal = ref(instanceToUse);
       }
       if (__DEV__) {
@@ -1406,6 +1440,7 @@ function commitAttachRef(finishedWork: Fiber) {
           );
         }
       }
+    //如果ref不是个函数
     } else {
       if (__DEV__) {
         if (!ref.hasOwnProperty('current')) {
@@ -1416,7 +1451,7 @@ function commitAttachRef(finishedWork: Fiber) {
           );
         }
       }
-
+      // 那仅仅就将ref指向节点实例
       ref.current = instanceToUse;
     }
   }
@@ -2735,6 +2770,7 @@ export function commitLayoutEffects(
   inProgressRoot = root;
 
   const current = finishedWork.alternate;
+  //执行
   commitLayoutEffectOnFiber(root, current, finishedWork, committedLanes);
 
   inProgressLanes = null;
