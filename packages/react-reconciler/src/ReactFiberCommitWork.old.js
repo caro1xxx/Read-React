@@ -749,7 +749,7 @@ function commitHookLayoutEffects(finishedWork: Fiber, hookFlags: HookFlags) {
   ) {
     try {
       startLayoutEffectTimer();
-      // 获取effects中的每一个effect并执行create方法,就相当于挂载
+      // 获取effects中的每一个effect并执行create方法
       commitHookEffectListMount(hookFlags, finishedWork);
     } catch (error) {
       captureCommitPhaseError(finishedWork, finishedWork.return, error);
@@ -1032,7 +1032,7 @@ function commitLayoutEffectOnFiber(
         committedLanes,
       );
       if (flags & Update) {
-        // 如果更新,执行
+        // 如果更新,执行commitHookLayoutEffects
         commitHookLayoutEffects(finishedWork, HookLayout | HookHasEffect);
       }
       break;

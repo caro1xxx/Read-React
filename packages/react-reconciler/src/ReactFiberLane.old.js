@@ -203,6 +203,7 @@ function getHighestPriorityLanes(lanes: Lanes | Lane): Lanes {
 
 export function getNextLanes(root: FiberRoot, wipLanes: Lanes): Lanes {
   // Early bailout if there's no pending work left.
+
   const pendingLanes = root.pendingLanes;
   if (pendingLanes === NoLanes) {
     return NoLanes;
@@ -210,13 +211,16 @@ export function getNextLanes(root: FiberRoot, wipLanes: Lanes): Lanes {
 
   let nextLanes = NoLanes;
 
-  const suspendedLanes = root.suspendedLanes;
-  const pingedLanes = root.pingedLanes;
+  const suspendedLanes = root.suspendedLanes; //0
+  const pingedLanes = root.pingedLanes; //0
 
   // Do not work on any idle work until all the non-idle work has finished,
   // even if the work is suspended.
+
+  // 获取非空闲lane
   const nonIdlePendingLanes = pendingLanes & NonIdleLanes;
   if (nonIdlePendingLanes !== NoLanes) {
+    // 获取 非空闲并且非挂起的lane
     const nonIdleUnblockedLanes = nonIdlePendingLanes & ~suspendedLanes;
     if (nonIdleUnblockedLanes !== NoLanes) {
       nextLanes = getHighestPriorityLanes(nonIdleUnblockedLanes);
@@ -418,11 +422,11 @@ export function markStarvedLanesAsExpired(
   const pingedLanes = root.pingedLanes;
   const expirationTimes = root.expirationTimes;
 
-  // 遍历待处理通道，并检查我们是否已经达到了它们的
+  // 遍历待处理通道，并检查我们是否已经到达了它们的
   // 过期时间。如果是这样，我们将假定更新被饿死，并将其标记为
   // 标记为过期，并把它的lane放到expiredLanes
   let lanes = pendingLanes;
-  // 这里判断lane是否有权限,即代表全是0的lane是无权限的,则不进入
+  // 这里循环条件是判断lane是否有权限,即代表全是0的lane是无权限的,则不进入
   while (lanes > 0) {
     /*
       pickArbitraryLaneIndex是找到lanes中最靠左的那个1在lanes中的index
@@ -444,7 +448,7 @@ export function markStarvedLanesAsExpired(
     const expirationTime = expirationTimes[index];
     // 这里就是在判断之前是否存在过expirationTimes[index]
     if (expirationTime === NoTimestamp) {
-      // 发现一个没有过期时间并且待处理的lane，如果它没被挂起，
+      // 发现一个没有过期时间并且待处理的lane，并且它没被挂起，
       // 或者被触发了，那么去计算过期时间
       if (
         // 代表没有被挂起

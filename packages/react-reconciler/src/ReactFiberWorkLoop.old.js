@@ -634,7 +634,6 @@ export function scheduleUpdateOnFiber(
 
 
 
-  //该判断是性能相关的
   if (
     (executionContext & RenderContext) !== NoLanes &&
     root === workInProgressRoot
@@ -863,7 +862,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
   let newCallbackNode;
   // 如果当前调度的任务是是一个 Scheduler 任务而不是一个“act”任务，则退出，重新调度“act”的队列
   if (newCallbackPriority === SyncLane) {
-    // 如果过期任务以同步优先级被调度
+    // 如果过期,任务以同步优先级被调度
     if (root.tag === LegacyRoot) {
       if (__DEV__ && ReactCurrentActQueue.isBatchingLegacy !== null) {
         ReactCurrentActQueue.didScheduleLegacyUpdate = true;
@@ -945,7 +944,7 @@ function ensureRootIsScheduled(root: FiberRoot, currentTime: number) {
 
 // This is the entry point for every concurrent task, i.e. anything that
 // goes through Scheduler.
-function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
+function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
   if (enableProfilerTimer && enableProfilerNestedUpdatePhase) {
     resetNestedUpdateFlag();
   }
@@ -982,6 +981,7 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
     root,
     root === workInProgressRoot ? workInProgressRootRenderLanes : NoLanes,
   );
+  // 永远不会执行
   if (lanes === NoLanes) {
     // Defensive coding. This is never expected to happen.
     return null;
@@ -997,11 +997,9 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
     !includesBlockingLane(root, lanes) &&
     !includesExpiredLane(root, lanes) &&
     (disableSchedulerTimeoutInWorkLoop || !didTimeout);
-  // shouldTimeSlice: false
+  // 走Sync还是Concurrent是根据shouldTimeSlice的结果来判断
   let exitStatus = shouldTimeSlice
-  // performConcurrentWorkOnRoot 会调用该方法
     ? renderRootConcurrent(root, lanes)
-  // performSyncWorkOnRoot 会调用该方法
     : renderRootSync(root, lanes);
   
   if (exitStatus !== RootInProgress) {
@@ -1082,7 +1080,9 @@ function performConcurrentWorkOnRoot(root/*null*/, didTimeout/*root*/) {
     }
   }
 
+  // 再次进入ensureRootIsScheduled,确保根调度
   ensureRootIsScheduled(root, now());
+  
   if (root.callbackNode === originalCallbackNode) {
     // The task node scheduled for this root is the same one that's
     // currently executed. Need to return a continuation.
@@ -1531,7 +1531,7 @@ export function flushSync(fn) {
     // 设置当前优先级为离散事件
     setCurrentUpdatePriority(DiscreteEventPriority);
     if (fn) {
-      // 执行callback
+      // 执行fn,fn就是updateContainer
       return fn();
     } else {
       return undefined;
@@ -1631,7 +1631,9 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
       可以被 workInProgress fiber tree 复用
   */
   //  这里最开始就只存在一棵树,那么就将root的结果全部copy一份到workInProgressRoot
+  // 这是双缓存顶点
   workInProgressRoot = root;
+  // createWorkInProgress创建缓存树
   const rootWorkInProgress = createWorkInProgress(root.current, null);
   workInProgress = rootWorkInProgress;
   workInProgressRootRenderLanes = renderLanes = lanes;
@@ -2341,6 +2343,7 @@ function commitRootImpl(
       (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
     NoFlags;
 
+  // 存在effect的情况
   if (subtreeHasEffects || rootHasEffect) {
     // 存在副作用，处理 Fiber 上的副作用
     const prevTransition = ReactCurrentBatchConfig.transition;
@@ -2407,7 +2410,20 @@ function commitRootImpl(
       从 current Fiber 树指向 workInProgress Fiber 树，也就是这行代码所做的工作
     */
     // 交换 workInProgress
+
     root.current = finishedWork;
+
+    /**
+     * 为什么要在 mutation 阶段结束后，layout 阶段之前执行呢？
+     * 
+     * 这是因为componentWillUnmount这个构造,绘制mutation时执行,可能会操作原来Fiber上的内容
+     * **为了保证数据的可靠性不会修改current指向**
+     * 
+     * 2而layout阶段会执行componentDidMount 和 componentDidUpdate钩子,此时需要获取到的 DOM 是更新后的
+     */
+
+
+
 
     // The next phase is the layout phase, where we call effects that read
     // the host tree after it's been mutated. The idiomatic use case for this is
@@ -2421,18 +2437,20 @@ function commitRootImpl(
     // 执行 layout
     commitLayoutEffects(finishedWork, root, lanes);
 
-    // Tell Scheduler to yield at the end of the frame, so the browser has an
-    // opportunity to paint.
+    // 告诉Scheduler在该帧的末尾让步，这样浏览器就有绘画的机会
     requestPaint();
 
     // 重置执行栈环境
     executionContext = prevExecutionContext;
 
-    // 将优先级重置为之前的 非同步优先级
+    // 将优先级重置为之前的 非同步优先级,表示effect执行完毕了
     setCurrentUpdatePriority(previousPriority);
     ReactCurrentBatchConfig.transition = prevTransition;
+  // 没有effect的情况
   } else {
-    // No effects.
+    // 没有effect还是会将current指向workInProgress
+
+    // 因为没有effect,所以也不会发生什么钩子的触发,所以这里改变current指向即可
     root.current = finishedWork;
     // Measure these anyway so the flamegraph explicitly shows that there were
     // no effects.
@@ -2455,8 +2473,7 @@ function commitRootImpl(
     rootWithPendingPassiveEffects = root;
     pendingPassiveEffectsLanes = lanes;
   } else {
-    // There were no passive effects, so we can immediately release the cache
-    // pool for this render.
+    // 没有任何被动的影响，所以我们可以立即释放这个缓存的池
     releaseRootPooledCache(root, remainingLanes);
   }
 

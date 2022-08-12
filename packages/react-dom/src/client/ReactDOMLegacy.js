@@ -247,7 +247,9 @@ function legacyRenderSubtreeIntoContainer(
     if (typeof callback === 'function') {
       const originalCallback = callback;
       callback = function() {
+        // 获取maybeRoot实例
         const instance = getPublicRootInstance(root);
+        //执行callback
         originalCallback.call(instance);
       };
     }

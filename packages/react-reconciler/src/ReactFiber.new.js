@@ -181,18 +181,6 @@ function FiberNode(
     this.selfBaseDuration = 0;
     this.treeBaseDuration = 0;
   }
-
-  if (__DEV__) {
-    // This isn't directly used but is handy for debugging internals:
-
-    this._debugSource = null;
-    this._debugOwner = null;
-    this._debugNeedsRemount = false;
-    this._debugHookTypes = null;
-    if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
-      Object.preventExtensions(this);
-    }
-  }
 }
 
 // This is a constructor function, rather than a POJO constructor, still
