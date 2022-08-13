@@ -3828,7 +3828,6 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
 
 // 真正的beginWork()
 function beginWork(
-  // current在初次挂载阶段一定会是null
   current: Fiber | null,
   workInProgress: Fiber,
   renderLanes: Lanes,
@@ -3855,6 +3854,7 @@ function beginWork(
   // 组件update时，由于之前已经mount过，所以current !== null。
   // 所以我们可以通过current === null ?来区分组件是处于mount还是update
   // update时：如果current存在可能存在优化路径，可以复用current（即上一次更新的Fiber节点）
+
   // update时
   if (current !== null) {
     const oldProps = current.memoizedProps;// 上一次更新的props
@@ -3936,7 +3936,6 @@ function beginWork(
   // move this assignment out of the common path and into each branch.
   workInProgress.lanes = NoLanes;
 
-  // 这里只会是mount时执行,因为在update执行完后已经return了
   // 首先会根据不同 Fiber 节点的 tag，执行不同的 case，进入不同类型的 Fiber 子节点创建逻辑
   switch (workInProgress.tag) {
     case IndeterminateComponent: {

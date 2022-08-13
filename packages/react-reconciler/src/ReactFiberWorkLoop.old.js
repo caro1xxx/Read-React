@@ -1631,6 +1631,7 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
       可以被 workInProgress fiber tree 复用
   */
   //  这里最开始就只存在一棵树,那么就将root的结果全部copy一份到workInProgressRoot
+  
   // 这是双缓存顶点
   workInProgressRoot = root;
   // createWorkInProgress创建缓存树
@@ -2005,7 +2006,7 @@ function performUnitOfWork(unitOfWork: Fiber /*workInProgress */): void {
   // The current, flushed, state of this fiber is the alternate. Ideally
   // nothing should rely on this, but relying on it here means that we don't
   // need an additional field on the work in progress.
-  // unitOfWork.alternate是节点副本
+  // unitOfWork.alternate是节点副本和缓存树对象是一样的
   const current = unitOfWork.alternate;
   setCurrentDebugFiberInDEV(unitOfWork);
 
@@ -2027,7 +2028,10 @@ function performUnitOfWork(unitOfWork: Fiber /*workInProgress */): void {
     next = beginWork(current, unitOfWork, renderLanes);
   }
 
+  // dev不管
   resetCurrentDebugFiberInDEV();
+
+
   // 收集props
   unitOfWork.memoizedProps = unitOfWork.pendingProps;
   if (next === null) {
@@ -2048,8 +2052,7 @@ function performUnitOfWork(unitOfWork: Fiber /*workInProgress */): void {
     当没有更多兄弟节点时，返回至父节点
 */
 function completeUnitOfWork(unitOfWork: Fiber): void {
-  // 尝试完成当前单位的工作，然后转到下一个
-  // 兄弟节点。如果没有更多的兄弟节点，则返回到父fiber。
+  // 尝试完成当前单位的工作，然后转到下一个,兄弟节点。如果没有更多的兄弟节点，则返回到父fiber。
   let completedWork = unitOfWork;
   do {
     // The current, flushed, state of this fiber is the alternate. Ideally
@@ -2063,6 +2066,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
     // Check if the work completed or if something threw.
 
     // Incomplete = 0b00000000001000000000000000;
+    
     // 没有异常
     // flags就是标记,类似lane,也是级别
     if ((completedWork.flags & Incomplete) === NoFlags) {
@@ -3191,6 +3195,8 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
     try {
       // 真正的beginWork()
       return originalBeginWork(current, unitOfWork, lanes);
+
+    //beginWork()出现错误才执行,没有出现错误就返回上一层函数了
     } catch (originalError) {
       if (
         didSuspendOrErrorWhileHydratingDEV() ||

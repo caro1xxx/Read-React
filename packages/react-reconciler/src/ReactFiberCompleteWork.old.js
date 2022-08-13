@@ -675,7 +675,7 @@ function bubbleProperties(completedWork: Fiber) {
   let subtreeFlags = NoFlags;
 
   if (!didBailout) {
-    // Bubble up the earliest expiration time.
+    // 将最早的到期的过期时间冒泡
     if (enableProfilerTimer && (completedWork.mode & ProfileMode) !== NoMode) {
       // In profiling mode, resetChildExpirationTime is also used to reset
       // profiler durations.
@@ -738,8 +738,9 @@ function bubbleProperties(completedWork: Fiber) {
     }
 
     completedWork.subtreeFlags |= subtreeFlags;
-  // 如果是执行这个else,那么说明didBailout未false
-  // 了,缓存树和备份节点不一致
+
+  // 如果是执行这个else,那么说明didBailout为true
+  // 了,缓存树和备份节点一致,并且不为null
   // 执行逻辑同上，不再赘述
   } else {
     // Bubble up the earliest expiration time.

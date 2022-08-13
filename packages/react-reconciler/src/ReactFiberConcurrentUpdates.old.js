@@ -51,6 +51,7 @@ let concurrentQueuesIndex = 0;
 let concurrentlyUpdatedLanes: Lanes = NoLanes;
 
 export function finishQueueingConcurrentUpdates(): void {
+  // concurrentQueuesIndex并发队列的长度
   const endIndex = concurrentQueuesIndex;
   concurrentQueuesIndex = 0;
 
