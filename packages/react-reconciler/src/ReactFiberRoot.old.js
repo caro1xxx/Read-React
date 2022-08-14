@@ -166,6 +166,16 @@ export function createFiberRoot(
     concurrentUpdatesByDefaultOverride,
   );
   // 在FiberRoot对象上挂载current属性,值为FiberHostRoot对象
+  /*
+    现在的样子大概就是:
+    uninitializedFiber:{
+        stateNode:{
+            root:{
+                current:FiberHostRoot
+            }
+        }
+    }
+  */
   root.current = uninitializedFiber;
   // 在FiberHostRoot对象上挂载stateNode:FiberRoot
   uninitializedFiber.stateNode = root;
@@ -184,23 +194,26 @@ export function createFiberRoot(
     root.pooledCache = initialCache;
     retainCache(initialCache);
     const initialState: RootState = {
-      element: initialChildren,
+      element: initialChildren,//查看createContainer函数中,会发现是null
       isDehydrated: hydrate,
       cache: initialCache,
     };
     uninitializedFiber.memoizedState = initialState;
   } else {
     const initialState: RootState = {
-      element: initialChildren,
+      element: initialChildren,//查看createContainer函数中,会发现是null
       isDehydrated: hydrate,
       cache: (null: any), // not enabled yet
     };
+    //memoizedState可以理解为`已经记录的state`
     uninitializedFiber.memoizedState = initialState;
   }
 
+  // 初始化updateQueue
   // 是有挂载updateQueue对象的
   initializeUpdateQueue(uninitializedFiber);
 
   // 返回挂载了FiberHostRoot对象的FiberRoot对象
+  // 这里返回的是root 并不是 uninitializedFiber!!!
   return root;
 }

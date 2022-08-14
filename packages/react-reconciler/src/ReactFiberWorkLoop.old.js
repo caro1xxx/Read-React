@@ -2066,7 +2066,7 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
     // Check if the work completed or if something threw.
 
     // Incomplete = 0b00000000001000000000000000;
-    
+
     // 没有异常
     // flags就是标记,类似lane,也是级别
     if ((completedWork.flags & Incomplete) === NoFlags) {
@@ -2089,13 +2089,14 @@ function completeUnitOfWork(unitOfWork: Fiber): void {
         // Update render duration assuming we didn't error.
         stopProfilerTimerIfRunningAndRecordDelta(completedWork, false);
       }
+
       resetCurrentDebugFiberInDEV();
 
       // 如果next存在，则表示产生了新 work
       if (next !== null) {
         // Completing this fiber spawned new work. Work on that next.
 
-        // 将next替换旧的缓存树,以便后续更新
+        // 将workInProgress替换为新的树,以便后续更新
         workInProgress = next;
         return;
       }

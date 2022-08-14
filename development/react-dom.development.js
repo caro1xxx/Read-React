@@ -10012,17 +10012,18 @@
     }
   } // Calculate the diff between the two objects.
 
-  function diffProperties(domElement, tag /* type */, lastRawProps, nextRawProps, rootContainerElement) {
+  function diffProperties(domElement/* instance */, tag /* type */, lastRawProps, nextRawProps, rootContainerElement) {
     {
       validatePropertiesInDevelopment(tag, nextRawProps);
     }
-
+  
     // 需要更新的props集合
     var updatePayload = null;
     // 老props
     var lastProps;
     // 新props
     var nextProps;
+  
     // input/option/select/textarea 无论内容是否有变化都会更新
     switch (tag) {
       case 'input':
@@ -10032,55 +10033,55 @@
         nextProps = getHostProps(domElement, nextRawProps);
         updatePayload = [];
         break;
-
+  
       case 'select':
         lastProps = getHostProps$1(domElement, lastRawProps);
         nextProps = getHostProps$1(domElement, nextRawProps);
         updatePayload = [];
         break;
-
+  
       case 'textarea':
         lastProps = getHostProps$2(domElement, lastRawProps);
         nextProps = getHostProps$2(domElement, nextRawProps);
         updatePayload = [];
         break;
-
+  
       default:
         lastProps = lastRawProps;
         nextProps = nextRawProps;
-
+  
         //如果需要更新绑定 click 方法的话
         if (typeof lastProps.onClick !== 'function' && typeof nextProps.onClick === 'function') {
           // TODO: This cast may not be sound for SVG, MathML or custom elements.
-
+  
           //初始化 onclick 事件，以便兼容Safari移动端
           trapClickOnNonInteractiveElement(domElement);
         }
-
+  
         break;
     }
-
+  
     // 判断新属性,比如 style是否正确赋值
     assertValidProps(tag, nextProps);
     var propKey;
     var styleName;
     var styleUpdates = null;
-
+  
     // 遍历所有旧prop
     for (propKey in lastProps) {
-
-      // 如果新props存在该属性 并且 老props没有该属性 并且 老props的该属性不为null 那么将会执行后续操作,否则continue
-      //通过该if判断的则为新增prop
+  
+      // 如果新props不存在该属性 并且 老props有该属性 并且 老props的该属性不为null 那么将会执行后续操作,否则continue
+      // 不通过该if判断的则为新增prop
       if (nextProps.hasOwnProperty(propKey) || !lastProps.hasOwnProperty(propKey) || lastProps[propKey] == null) {
         continue;
       }
-
+  
       //对 style 属性进行操作，<div style={{height:30,}}></div>
       // var STYLE = 'style';
       if (propKey === STYLE) {
         // 获取旧的style属性对象
         var lastStyle = lastProps[propKey];
-
+  
         // 遍历老style属性对象
         for (styleName in lastStyle) {
           // 如果老style对象存在该style属性
@@ -10089,7 +10090,7 @@
             if (!styleUpdates) {
               styleUpdates = {};
             }
-            //在styleUpdates对象中新增一个该syle属性的值为''
+            //在styleUpdates对象中新增一个该syle属性的值为'',即删除该style
             styleUpdates[styleName] = '';
           }
         }
@@ -10108,24 +10109,22 @@
         (updatePayload = updatePayload || []).push(propKey, null);
       }
     }
-
+  
     // 遍历新props
     for (propKey in nextProps) {
       // 获取新props值
       var nextProp = nextProps[propKey];
-      // 因为是根据新props获取老props中的该属性,所以没有则会是undefined
+      // 判断旧props是否存在,如果不存在那么lastProp就查找propKey下表的值,反正为undefined
       var lastProp = lastProps != null ? lastProps[propKey] : undefined;
-
-      // 如果新props不存在该属性
-      // 或新props和老props一致,说明是相同的,即没有更新
-      // 或新props == null 并且 老props也 == null 即没有更新
+  
+      // 如果新props不存在该key 或者 新props==lastprop 或者 (新prop不存在并且老prop也不存在) 那么就判定为没有更新的情况,跳出本次循环
       if (!nextProps.hasOwnProperty(propKey) || nextProp === lastProp || nextProp == null && lastProp == null) {
         // 如果走到这里说明是没有更新的情况
         continue;
       }
-
+  
       // 走到这里说明是props更新了
-
+  
       // style 属性的更新 <input style={{xxx:yyy}}/>
       if (propKey === STYLE) {
         {
@@ -10136,24 +10135,23 @@
             Object.freeze(nextProp);
           }
         }
-
+  
         //如果老 props 本来就有这个 prop 的话
         if (lastProp) {
-          // Unset styles on `lastProp` but not on `nextProp`.
-
+          // 取消对 "lastProp "的样式设置
           // 遍历老props
           for (styleName in lastProp) {
-            // 如果新style没有改props,那么将置为''  即删除该style
+            // 如果新style没有该props,那么将置为''  即删除该style
             if (lastProp.hasOwnProperty(styleName) && (!nextProp || !nextProp.hasOwnProperty(styleName))) {
               if (!styleUpdates) {
                 styleUpdates = {};
               }
-
+  
               styleUpdates[styleName] = '';
             }
           } // Update styles that changed since `lastProp`.
-
-
+  
+  
           // 遍历新props
           for (styleName in nextProp) {
             // 新props存在该style 并且 老props的该属性 !== 新props的该属性
@@ -10173,10 +10171,11 @@
             if (!updatePayload) {
               updatePayload = [];
             }
-
+  
+            //将styleUpdates放入updatePayload
             updatePayload.push(propKey, styleUpdates);
           }
-
+  
           styleUpdates = nextProp;
         }
       // __html
@@ -10185,7 +10184,7 @@
         var nextHtml = nextProp ? nextProp[HTML$1] : undefined;
         // 老innerHTML
         var lastHtml = lastProp ? lastProp[HTML$1] : undefined;
-
+  
         if (nextHtml != null) {
           if (lastHtml !== nextHtml) {
             (updatePayload = updatePayload || []).push(propKey, nextHtml);
@@ -10202,12 +10201,12 @@
           if ( typeof nextProp !== 'function') {
             warnForInvalidEventListener(propKey, nextProp);
           }
-
+  
           if (propKey === 'onScroll') {
             listenToNonDelegatedEvent('scroll', domElement);
           }
         }
-
+  
         if (!updatePayload && lastProp !== nextProp) {
           // This is a special case. If any listener updates we need to ensure
           // that the "current" props pointer gets updated so we need a commit
@@ -10221,17 +10220,18 @@
         (updatePayload = updatePayload || []).push(propKey, nextProp);
       }
     }
-
+  
+    // DEV环境
     // 如果style对象中有值
     if (styleUpdates) {
       {
         validateShorthandPropertyCollisionInDev(styleUpdates, nextProps[STYLE]);
       }
-
+  
       //将有关 style 的更新 push 进 updatePayload 中
       (updatePayload = updatePayload || []).push(STYLE, styleUpdates);
     }
-
+  
     // 返回 style数组
     return updatePayload;
   } // Apply the diff.
@@ -10678,62 +10678,83 @@
       dlItemTagAutoclosing: null
     };
 
-    updatedAncestorInfo = function (oldInfo, tag) {
-      var ancestorInfo = assign({}, oldInfo || emptyAncestorInfo);
-
+    updatedAncestorInfo = function (oldInfo /*祖先节点信息 */, tag) {
+      // 将oldInfo||emptyAncestorInfo所有可枚举的自有属性赋值到新对象{}上
+      var ancestorInfo = assign({}, oldInfo || emptyAncestorInfo); //Object.assign
+    
       var info = {
-        tag: tag
+        tag: tag, //tag就是type
       };
-
+    
+      /*
+        inScopeTags = ['applet', 'caption', 'html', 'table', 'td', 'th', 
+        'marquee', 'object', 'template','foreignObject', 'desc', 'title'];
+      */
       if (inScopeTags.indexOf(tag) !== -1) {
         ancestorInfo.aTagInScope = null;
         ancestorInfo.buttonTagInScope = null;
         ancestorInfo.nobrTagInScope = null;
       }
-
+    
+      // var buttonScopeTags = inScopeTags.concat(['button']);
       if (buttonScopeTags.indexOf(tag) !== -1) {
         ancestorInfo.pTagInButtonScope = null;
       } // See rules for 'li', 'dd', 'dt' start tags in
       // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inbody
-
-
-      if (specialTags.indexOf(tag) !== -1 && tag !== 'address' && tag !== 'div' && tag !== 'p') {
+    
+      /*
+        var specialTags = ['address', 'applet', 'area', 'article', 'aside', 'base', 
+      'basefont', 'bgsound', 'blockquote', 'body', 'br', 'button', 'caption', 'center', 'col', 'colgroup', 
+      'dd', 'details', 'dir', 'div', 'dl', 'dt', 'embed', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 
+      'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'iframe', 
+      'img', 'input', 'isindex', 'li', 'link', 'listing', 'main', 'marquee', 'menu', 'menuitem', 'meta', 'nav', 
+      'noembed', 'noframes', 'noscript', 'object', 'ol', 'p', 'param', 'plaintext', 'pre', 'script', 'section', 
+      'select', 'source', 'style', 'summary', 'table', 'tbody', 'td', 'template', 'textarea', 'tfoot', 'th', 
+      'thead', 'title', 'tr', 'track', 'ul', 'wbr', 'xmp'];
+      */
+      if (
+        specialTags.indexOf(tag) !== -1 &&
+        tag !== "address" &&
+        tag !== "div" &&
+        tag !== "p"
+      ) {
         ancestorInfo.listItemTagAutoclosing = null;
         ancestorInfo.dlItemTagAutoclosing = null;
       }
-
+    
       ancestorInfo.current = info;
-
-      if (tag === 'form') {
+    
+      if (tag === "form") {
         ancestorInfo.formTag = info;
       }
-
-      if (tag === 'a') {
+    
+      if (tag === "a") {
         ancestorInfo.aTagInScope = info;
       }
-
-      if (tag === 'button') {
+    
+      if (tag === "button") {
         ancestorInfo.buttonTagInScope = info;
       }
-
-      if (tag === 'nobr') {
+    
+      if (tag === "nobr") {
         ancestorInfo.nobrTagInScope = info;
       }
-
-      if (tag === 'p') {
+    
+      if (tag === "p") {
         ancestorInfo.pTagInButtonScope = info;
       }
-
-      if (tag === 'li') {
+    
+      if (tag === "li") {
         ancestorInfo.listItemTagAutoclosing = info;
       }
-
-      if (tag === 'dd' || tag === 'dt') {
+    
+      if (tag === "dd" || tag === "dt") {
         ancestorInfo.dlItemTagAutoclosing = info;
       }
-
+    
       return ancestorInfo;
     };
+    
     /**
      * Returns whether
      */
@@ -11090,7 +11111,14 @@
 
       if (typeof newProps.children !== typeof oldProps.children && (typeof newProps.children === 'string' || typeof newProps.children === 'number')) {
         var string = '' + newProps.children;
+        /**
+         * updatedAncestorInfo:对祖先的标签type进行判断,是否需要特殊处理,
+         * 如果祖先的标签type属于特殊的标签,那么会在ancestorInfo.xxxx属性上添加tag对象
+         * tag:{tag:祖先的元素type}
+         * 否则将tag对象置于ancestorInfo.current上
+         */
         var ownAncestorInfo = updatedAncestorInfo(hostContextDev.ancestorInfo, type);
+        //找到父节点和祖先节点上的无效tag
         validateDOMNesting(null, string, ownAncestorInfo);
       }
     }
@@ -11105,10 +11133,13 @@
   function createTextInstance(text, rootContainerInstance, hostContext, internalInstanceHandle) {
     {
       var hostContextDev = hostContext;
+      // 校验
       validateDOMNesting(null, text, hostContextDev.ancestorInfo);
     }
-
+    
+    // 创建文本节点
     var textNode = createTextNode(text, rootContainerInstance);
+    //创建指向 fiber 对象的属性，方便从DOM 实例上获取 fiber 对象
     precacheFiberNode(internalInstanceHandle, textNode);
     return textNode;
   }

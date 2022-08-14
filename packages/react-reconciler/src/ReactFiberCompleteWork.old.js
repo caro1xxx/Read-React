@@ -220,7 +220,7 @@ if (supportsMutation) {
   ) {
     // We only have the top Fiber that was created but we need recurse down its
     // children to find all the terminal nodes.
-
+  
     //获取该节点的第一个子节点
     let node = workInProgress.child;
     // 当该节点有子节点时
@@ -249,7 +249,7 @@ if (supportsMutation) {
         if (node.return === null || node.return === workInProgress) {
           return;
         }
-        // 将当前节点的直接父节点
+        // 将当前节点指向自己的父节点
         node = node.return;
       }
       //将当前节点的兄弟节点的父节点 指向当前节点的父节点
@@ -267,8 +267,8 @@ if (supportsMutation) {
     current: Fiber,
     workInProgress: Fiber,
     type: Type,
-    newProps: Props,
-    rootContainerInstance: Container,
+    newProps: Props, //当前的props
+    rootContainerInstance: Container,//getRootHostContainer()执行结果
   ) {
     // If we have an alternate, that means this is an update and we need to
     // schedule a side-effect to do the updates.
@@ -322,7 +322,7 @@ if (supportsMutation) {
     oldText: string,
     newText: string,
   ) {
-    // If the text differs, mark it as an update. All the work in done in commitWork.
+    //如果文本有差异，就标记为更新。所有的工作都在commitWork中完成。
     if (oldText !== newText) {
       markUpdate(workInProgress);
     }
@@ -1037,8 +1037,8 @@ function completeWork(
           current,
           workInProgress,
           type,
-          newProps,
-          rootContainerInstance,
+          newProps, //当前的props
+          rootContainerInstance,//getRootHostContainer()执行结果
         );
 
         //ref指向有变动的话，更新 ref
@@ -1048,7 +1048,8 @@ function completeWork(
         }
       // 反之就是挂载
       } else {
-        // 不存在新props说明不是更新,并且初始化也没有携带props
+        // 不存在新props,并且初始化也没有携带props
+        // 但是如果存在props
         if (!newProps) {
           if (workInProgress.stateNode === null) {
             throw new Error(
@@ -1057,7 +1058,7 @@ function completeWork(
             );
           }
 
-          // This can happen when we abort work.
+          // 这可能发生在我们中止工作的时候。
           bubbleProperties(workInProgress);
           return null;
         }
@@ -1086,7 +1087,7 @@ function completeWork(
           }
         // 客服端渲染
         } else {
-          // 为fiber创建对应DOM节点
+          // 为fiber创建对应DOM节点(domElement)
           const instance = createInstance(
             type,
             newProps,
