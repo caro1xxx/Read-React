@@ -997,6 +997,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
     !includesBlockingLane(root, lanes) &&
     !includesExpiredLane(root, lanes) &&
     (disableSchedulerTimeoutInWorkLoop || !didTimeout);
+  // shouldTimeSlice函数根据lane的优先级，决定是使用并发模式还是同步模式渲染(解决饥饿问题)
   // 走Sync还是Concurrent是根据shouldTimeSlice的结果来判断
   let exitStatus = shouldTimeSlice
     ? renderRootConcurrent(root, lanes)
@@ -1871,6 +1872,12 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
     } catch (thrownValue) {
       handleError(root, thrownValue);
     }
+  /**
+   * 这里是永真,如果workLoopSync()是抛出错误,那么
+   * 将不会执行到break,所以还得再执行一次workLoopSync()
+   * 如果workLoopSync()是正常执行完毕,那么就会依次执行break,就
+   * 退出永真循环了
+   */
   } while (true);
   resetContextDependencies();
 
@@ -1895,7 +1902,7 @@ function renderRootSync(root: FiberRoot, lanes: Lanes) {
     markRenderStopped();
   }
 
-  // Set this to null to indicate there's no in-progress render.
+  //将此设置为空，表示没有正在进行的渲染
   workInProgressRoot = null;
   workInProgressRootRenderLanes = NoLanes;
 
@@ -1915,12 +1922,14 @@ function workLoopSync() {
 }
 
 function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
+  // 保存执行上下文
   const prevExecutionContext = executionContext;
+  // 给 executionContext 增加渲染上下文 RenderContext
   executionContext |= RenderContext;
+  // 保存现场——将 dispatcher 存入栈
   const prevDispatcher = pushDispatcher();
 
-  // If the root or lanes have changed, throw out the existing stack
-  // and prepare a fresh one. Otherwise we'll continue where we left off.
+  //如果根或车道发生了变化，扔掉现有的堆栈并准备一个新的,否则退出
   if (workInProgressRoot !== root || workInProgressRootRenderLanes !== lanes) {
     if (enableUpdaterTracking) {
       if (isDevToolsPresent) {
@@ -1939,7 +1948,10 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
     }
 
     workInProgressTransitions = getTransitionsForLanes(root, lanes);
+    // 重置 timer
     resetRenderTimer();
+    // 准备一个新的栈
+    // 作用:创建workInProgress树
     prepareFreshStack(root, lanes);
   }
 
@@ -1955,15 +1967,19 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
 
   do {
     try {
+      // 重点
       workLoopConcurrent();
       break;
     } catch (thrownValue) {
       handleError(root, thrownValue);
     }
   } while (true);
+  // 重置上下文依赖
   resetContextDependencies();
 
+  // 恢复现场——从栈中 pop dispatcher
   popDispatcher(prevDispatcher);
+  // 恢复原来的执行上下文
   executionContext = prevExecutionContext;
 
   if (__DEV__) {
@@ -1972,31 +1988,35 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
     }
   }
 
-  // Check if the tree has completed.
+  // 检查该树是否已经完成
   if (workInProgress !== null) {
-    // Still work remaining.
+    //如果仍有剩余的工作
     if (enableSchedulingProfiler) {
+      // 继续
       markRenderYielded();
     }
+    // RootInProgress表示正在进行中
     return RootInProgress;
   } else {
-    // Completed the tree.
+    // 完成了该树
     if (enableSchedulingProfiler) {
+      // 标记 渲染停止
       markRenderStopped();
     }
 
-    // Set this to null to indicate there's no in-progress render.
+    // 将此设置为空，表示没有正在进行的渲染
     workInProgressRoot = null;
     workInProgressRootRenderLanes = NoLanes;
 
-    // Return the final exit status.
+    // 返回退出状态
     return workInProgressRootExitStatus;
   }
 }
 
 /** @noinline */
 function workLoopConcurrent() {
-  // Perform work until Scheduler asks us to yield
+  // 执行工作，直到Scheduler要求放弃
+  // shouldYield()就是关键所在
   while (workInProgress !== null && !shouldYield()) {
     performUnitOfWork(workInProgress);
   }
