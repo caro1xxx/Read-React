@@ -1003,7 +1003,9 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
     ? renderRootConcurrent(root, lanes)
     : renderRootSync(root, lanes);
   
+  // 检查退出状态
   if (exitStatus !== RootInProgress) {
+    // 是否出错
     if (exitStatus === RootErrored) {
       // If something threw an error, try rendering one more time. We'll
       // render synchronously to block concurrent data mutations, and we'll
@@ -1015,6 +1017,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
         exitStatus = recoverFromConcurrentError(root, errorRetryLanes);
       }
     }
+    // 是否是死亡了
     if (exitStatus === RootFatalErrored) {
       const fatalError = workInProgressRootFatalError;
       prepareFreshStack(root, NoLanes);
@@ -1023,6 +1026,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
       throw fatalError;
     }
 
+    // 是否没有完成
     if (exitStatus === RootDidNotComplete) {
       // The render unwound without completing the tree. This happens in special
       // cases where need to exit the current render without producing a
@@ -1032,7 +1036,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
       // synchronous update. We should have already checked for this when we
       // unwound the stack.
       markRootSuspended(root, lanes);
-    // 渲染完成进入
+    // 最后那就是渲染完成进入
     } else {
       // The render completed.
 
@@ -1053,7 +1057,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
         // 如果Concurrent模式下,store状态不一致,那么进行同步渲染
         exitStatus = renderRootSync(root, lanes);
 
-        // 再次判断是否渲染完成
+        // 再次判断是否出错
         if (exitStatus === RootErrored) {
           const errorRetryLanes = getLanesToRetrySynchronouslyOnError(root);
           if (errorRetryLanes !== NoLanes) {
@@ -1063,7 +1067,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
             // concurrent events.
           }
         }
-        // 判断退出状态
+        // 再次判断是否死亡
         if (exitStatus === RootFatalErrored) {
           const fatalError = workInProgressRootFatalError;
           prepareFreshStack(root, NoLanes);
