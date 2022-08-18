@@ -1089,8 +1089,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
   ensureRootIsScheduled(root, now());
   
   if (root.callbackNode === originalCallbackNode) {
-    // The task node scheduled for this root is the same one that's
-    // currently executed. Need to return a continuation.
+    // 为这个根安排的任务节点是目前正在执行的那个,需要返回一个 continuation.
     return performConcurrentWorkOnRoot.bind(null, root);
   }
   return null;
@@ -1178,19 +1177,16 @@ function finishConcurrentRender(root, exitStatus, lanes) {
     case RootSuspended: {
       markRootSuspended(root, lanes);
 
-      // We have an acceptable loading state. We need to figure out if we
-      // should immediately commit it or wait a bit.
-
+      // 我们有一个可接受的加载状态。我们需要弄清楚是否应该立即提交还是等待一下。
       if (
         includesOnlyRetries(lanes) &&
         // do not delay if we're inside an act() scope
         !shouldForceFlushFallbacksInDEV()
       ) {
-        // This render only included retries, no updates. Throttle committing
-        // retries so that we don't show too many loading states too quickly.
+        // 这次渲染只包括重试,没有更新.
         const msUntilTimeout =
           globalMostRecentFallbackTime + FALLBACK_THROTTLE_MS - now();
-        // Don't bother with a very short suspense time.
+        // 不要为很短的挂起时间而烦恼
         if (msUntilTimeout > 10) {
           const nextLanes = getNextLanes(root, NoLanes);
           if (nextLanes !== NoLanes) {
@@ -2249,7 +2245,7 @@ function commitRootImpl(
 ) {
   // 采用 do while 的作用是，在 useEffect 内部
   // 可能会触发新的更新，新的更新可能会触发新的副作用 ，因此需要不断的循环，直到 为 null
-  //这一步是为了看看还有没有没有执行的 useEffect， 有的话先执行他们
+  // 这一步是为了看看还有没有 没有执行的 useEffect， 有的话先执行他们
   do {
     // `flushPassiveEffects` will call `flushSyncUpdateQueue` at the end, which
     // means `flushPassiveEffects` will sometimes result in additional
@@ -2262,7 +2258,7 @@ function commitRootImpl(
   flushRenderPhaseStrictModeWarningsInDEV();
 
 
-  // 当前的 rootFiber
+  // finishedWork就是alternate
   const finishedWork = root.finishedWork;
   // 优先级相关
   const lanes = root.finishedLanes;
@@ -2287,32 +2283,33 @@ function commitRootImpl(
 
   if (finishedWork === root.current) {
     throw new Error(
+      // 无法提交与之前相同的树。这个错误可能是由React的一个bug引起的。请提交一个问题。
       'Cannot commit the same tree as before. This error is likely caused by ' +
         'a bug in React. Please file an issue.',
     );
   }
 
-  // commitRoot never returns a continuation; it always finishes synchronously.
-  // So we can clear these now to allow a new callback to be scheduled.
-
-  // 绑定 scheduler 的回调函数
+  // commitRoot绝不会返回一个continuation；它总是同步完成的。
+  // 所以我们现在可以清除这些，以允许安排一个新的回调
+  // 清空回调
   root.callbackNode = null;
   root.callbackPriority = NoLane;
 
   // 检查哪些车道上不再有任何工作安排，并将这些车道标记为已完成
   let remainingLanes = mergeLanes(finishedWork.lanes, finishedWork.childLanes);
 
-  // Make sure to account for lanes that were updated by a concurrent event
-  // during the render phase; don't mark them as finished.
+  // 请确保考虑到在渲染阶段`被并发事件更新`的车道
+  // 在渲染阶段，不要把它们标记为完成。
+  // 这一步主要就是校验是否有被并发更新的车道,然后将并发更新的车道合并
   const concurrentlyUpdatedLanes = getConcurrentlyUpdatedLanes();
   remainingLanes = mergeLanes(remainingLanes, concurrentlyUpdatedLanes);
 
+  //将remainingLanes中的所有车道标记已完成
   markRootFinished(root, remainingLanes);
 
   // 处理光标，重置一些 render 阶段使用的变量
-
   if (root === workInProgressRoot) {
-    // We can reset these now that they are finished.
+    // 我们现在可以重新设置这些，因为它们已经完成了。
     workInProgressRoot = null;
     workInProgress = null;
     workInProgressRootRenderLanes = NoLanes;
@@ -2367,6 +2364,7 @@ function commitRootImpl(
     (finishedWork.subtreeFlags &
       (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
     NoFlags;
+  // root是否有effect
   const rootHasEffect =
     (finishedWork.flags &
       (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
@@ -2506,7 +2504,9 @@ function commitRootImpl(
     releaseRootPooledCache(root, remainingLanes);
   }
 
-  // Read this again, since an effect might have updated it
+
+
+  // 再次读取一下pendingLanes,防止有effect在中途出现了
   remainingLanes = root.pendingLanes;
 
   // Check if there's remaining work on this root
@@ -2520,8 +2520,7 @@ function commitRootImpl(
   // retries or transitions). It's been like this for a while, though, so fixing
   // it probably isn't that urgent.
   if (remainingLanes === NoLanes) {
-    // If there's no remaining work, we can clear the set of already failed
-    // error boundaries.
+    // 如果没有剩余的工作，我们可以清除已经失败的一组错误的边界
     legacyErrorBoundariesThatAlreadyFailed = null;
   }
 
@@ -2531,9 +2530,9 @@ function commitRootImpl(
   // commit 阶段结尾，可能会在 commit 阶段产生新的更新，因此在 commit 阶段的结尾会重新调度一次
   ensureRootIsScheduled(root, now());
 
+  // 判断recoverableErrors是否存在,如果存在说明出现了错误
   if (recoverableErrors !== null) {
-    // There were errors during this render, but recovered from them without
-    // needing to surface it to the UI. We log them here.
+    // 在这次渲染过程中出现了一些错误，但从这些错误中恢复过来，不需要把它浮现在用户界面上。我们在这里记录它们
     const onRecoverableError = root.onRecoverableError;
     for (let i = 0; i < recoverableErrors.length; i++) {
       const recoverableError = recoverableErrors[i];
@@ -2550,11 +2549,9 @@ function commitRootImpl(
     throw error;
   }
 
-  // If the passive effects are the result of a discrete render, flush them
-  // synchronously at the end of the current task so that the result is
-  // immediately observable. Otherwise, we assume that they are not
-  // order-dependent and do not need to be observed by external systems, so we
-  // can wait until after paint.
+  // 如果被动效果是离散渲染的结果，就在当前任务结束时同步冲刷它们，这样就可以立即观察到结果。
+  // 否则(不是离散渲染)，我们假设它们不受顺序(异步)的影响，不需要被外部系统观察到，所以我们可以等到绘制之后再进行
+
   // TODO: We can optimize this by not scheduling the callback earlier. Since we
   // currently schedule the callback in multiple places, will wait until those
   // are consolidated.
@@ -2565,7 +2562,7 @@ function commitRootImpl(
     flushPassiveEffects();
   }
 
-  // Read this again, since a passive effect might have updated it
+  // 再读一下这个，因为一个被动效果可能已经更新了
   remainingLanes = root.pendingLanes;
   if (includesSomeLane(remainingLanes, (SyncLane: Lane))) {
     if (enableProfilerTimer && enableProfilerNestedUpdatePhase) {
@@ -2618,12 +2615,9 @@ export function flushPassiveEffects(): boolean {
   // 如果 rootWithPendingPassiveEffects 存在，说明
   // 使用了 useEffect 或者有子节点被删除
   if (rootWithPendingPassiveEffects !== null) {
-    // Cache the root since rootWithPendingPassiveEffects is cleared in
-    // flushPassiveEffectsImpl
+    //缓存根部，因为rootWithPendingPassiveEffects会在flushPassiveEffectsImpl进行清空
     const root = rootWithPendingPassiveEffects;
-    // Cache and clear the remaining lanes flag; it must be reset since this
-    // method can be called from various places, not always from commitRoot
-    // where the remaining lanes are known
+    // 缓存并清除剩余的车道标志；它必须被重置，因为这个,方法可以从不同的地方被调用，而不总是从 commitRoot
     const remainingLanes = pendingPassiveEffectsRemainingLanes;
     pendingPassiveEffectsRemainingLanes = NoLanes;
 

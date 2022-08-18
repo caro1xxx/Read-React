@@ -252,7 +252,7 @@ function safelyDetachRef(current: Fiber, nearestMountedAncestor: Fiber | null) {
   const ref = current.ref;
   // ref存在
   if (ref !== null) {
-    // 如果null是个fn
+    // 如果ref是个fn
     if (typeof ref === 'function') {
       let retVal;
       try {
@@ -822,7 +822,7 @@ function commitClassLayoutLifecycles(
         captureCommitPhaseError(finishedWork, finishedWork.return, error);
       }
     }
-  // 反之解释更新
+  // 反之就是更新
   } else {
     const prevProps =
       finishedWork.elementType === finishedWork.type
@@ -1018,14 +1018,16 @@ function commitLayoutEffectOnFiber(
   finishedWork: Fiber,
   committedLanes: Lanes,
 ): void {
-  // When updating this function, also update reappearLayoutEffects, which does
-  // most of the same things when an offscreen tree goes from hidden -> visible.
+
+  // 在更新这个函数时，也要更新reappearLayoutEffects，它的作用是
+  // 把不在屏幕上显示的那颗树 从隐藏 => 可见时
+
   const flags = finishedWork.flags;
   switch (finishedWork.tag) {
     case FunctionComponent:
     case ForwardRef:
     case SimpleMemoComponent: {
-      // 递归的获取子节点
+      // 递归的获取子节点,在将这些子节点调用commitLayoutEffectOnFiber
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1039,7 +1041,7 @@ function commitLayoutEffectOnFiber(
     }
     // 类组件的情况
     case ClassComponent: {
-      // 递归的获取子节点
+      // 递归的获取子节点,在将这些子节点调用commitLayoutEffectOnFiber
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1064,7 +1066,7 @@ function commitLayoutEffectOnFiber(
     }
     // 顶部节点情况
     case HostRoot: {
-      // 递归的获取子节点
+      // 递归的获取子节点,在将这些子节点调用commitLayoutEffectOnFiber
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1102,7 +1104,7 @@ function commitLayoutEffectOnFiber(
     }
     // 顶部组件情况
     case HostComponent: {
-      // 递归的获取子节点
+      // 递归的获取子节点,在将这些子节点调用commitLayoutEffectOnFiber
       recursivelyTraverseLayoutEffects(
         finishedRoot,
         finishedWork,
@@ -1941,8 +1943,8 @@ function commitDeletionEffectsOnFiber(
         hostParentIsContainer = prevHostParentIsContainer;
 
         if (hostParent !== null) {
-          // Now that all the child effects have unmounted, we can remove the
-          // node from the tree.
+          // 现在，所有的子效果都已经卸载了，我们可以把
+          //节点从树中删除
           if (hostParentIsContainer) {
             // 从容器移除子节点
             removeChildFromContainer(
@@ -2313,6 +2315,7 @@ export function commitMutationEffects(
   commitMutationEffectsOnFiber(finishedWork, root, committedLanes);
   setCurrentDebugFiberInDEV(finishedWork);
 
+  // 重置
   inProgressLanes = null;
   inProgressRoot = null;
 }

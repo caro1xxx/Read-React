@@ -54,30 +54,37 @@ export function flushSyncCallbacks() {
     // 防止重入
     isFlushingSyncQueue = true;
     let i = 0;
+    // 获取当前更新优先级
     const previousUpdatePriority = getCurrentUpdatePriority();
     try {
+      // 是否同步
       const isSync = true;
+      // 获取同步队列
       const queue = syncQueue;
-      // TODO: Is this necessary anymore? The only user code that runs in this
-      // queue is in the render or commit phases.
+      //设置当前更新优先级为离散
       setCurrentUpdatePriority(DiscreteEventPriority);
+      // 遍历同步队列
       for (; i < queue.length; i++) {
         let callback = queue[i];
+        // 依次执行同步队列中所有callabck,知道为null后进行下一个任务
         do {
           callback = callback(isSync);
         } while (callback !== null);
       }
+      // 重置
       syncQueue = null;
       includesLegacySyncCallbacks = false;
     } catch (error) {
-      // If something throws, leave the remaining callbacks on the queue.
+      // 如果有错误抛出，就把剩余的回调留在队列中。
       if (syncQueue !== null) {
         syncQueue = syncQueue.slice(i + 1);
       }
-      // Resume flushing in the next tick
+      //在下一个tick冲洗
+      // 这里的意思就是将flushSyncCallbacks这个任务以ImmediatePriority(立即执行的方式)放入调度器里,等待下一次执行
       scheduleCallback(ImmediatePriority, flushSyncCallbacks);
       throw error;
     } finally {
+      // 恢复
       setCurrentUpdatePriority(previousUpdatePriority);
       isFlushingSyncQueue = false;
     }
