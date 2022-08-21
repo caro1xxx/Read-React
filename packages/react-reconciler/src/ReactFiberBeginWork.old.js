@@ -1124,6 +1124,7 @@ function updateFunctionComponent(
     }
     setIsRendering(false);
   } else {
+    // renderWithHooks进入useState
     nextChildren = renderWithHooks(
       current,
       workInProgress,

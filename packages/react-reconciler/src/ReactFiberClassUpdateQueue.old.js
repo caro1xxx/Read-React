@@ -235,7 +235,7 @@ export function createUpdate(eventTime: number /**now() */, lane: Lane /**离散
 
 
 export function enqueueUpdate<State>(
-  fiber: Fiber, //FiberHostRoot对象
+  fiber: Fiber,
   update: Update<State>, //update对象
   lane: Lane, //调度优先级
 ): FiberRoot | null {
@@ -266,7 +266,8 @@ export function enqueueUpdate<State>(
     return null;
   }
 
-  
+  //在上篇文章的initializeUpdateQueue函数中queue对象上的share就是updateQueue.shared
+  //因为queue最终挂载到了fiber.updateQueue上
   const sharedQueue: SharedQueue<State> = (updateQueue: any).shared;
 
   if (__DEV__) {

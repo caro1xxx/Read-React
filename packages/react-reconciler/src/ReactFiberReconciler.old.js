@@ -342,15 +342,18 @@ export function updateContainer(
   // 当前时间戳
   const eventTime = requestEventTime();
   // 创建一个优先级变量(车道模型)
+  //requestUpdateLane返回了0
   const lane = requestUpdateLane(current);
 
   if (enableSchedulingProfiler) {
     markRenderScheduled(lane);
   }
 
-  // 因为parentComponent此时是null,所以context是{}
+  // 因为parentComponent此时是null,所以context是emptyContextObject
   const context = getContextForSubtree(parentComponent);
+  // 最开始container不存在context属性
   if (container.context === null) {
+    // 赋值emptyContextObject
     container.context = context;
   } else {
     container.pendingContext = context;
@@ -373,7 +376,7 @@ export function updateContainer(
     }
   }
 
-  // 此时update={
+  // 得到update={
     // eventTime,
     // lane,
 
@@ -390,7 +393,7 @@ export function updateContainer(
   // 根据车道优先级, 创建update对象, 并加入fiber.updateQueue.pending队列
   const update = createUpdate(eventTime, lane);
 
-  // payload赋值 App
+  // element就是App
   update.payload = {element};
 
   // callback存在

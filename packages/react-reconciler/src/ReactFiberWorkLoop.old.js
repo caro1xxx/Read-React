@@ -510,7 +510,7 @@ export function requestEventTime() {
   // executionContext 1表示有,0表示无
   // RenderContext 1表示有,0表示无
   // CommitContext 1表示有,0表示无
-  // 使用 | 来赋值添加权限
+  // 使用 | 来添加权限
   // 使用 & 来判断权限
   if ((executionContext & (RenderContext | CommitContext)) !== NoContext) {
     // We're inside React, so it's fine to read the actual time.
@@ -532,6 +532,14 @@ export function getCurrentTime() {
 
 export function requestUpdateLane(fiber: Fiber): Lane {
   // 获取到当前渲染的模式：sync mode（同步模式） 或 concurrent mode（并发模式）
+
+  // 执行到这里的时候mode = 3
+  /*
+    1，普通模式，同步渲染
+    2，并发模式，异步渲染
+    3，严格模式，用来检测是否存在废弃API
+    4，性能测试模式，用来检测哪里存在性能问题
+  */
   const mode = fiber.mode;
   if ((mode & ConcurrentMode) === NoMode) {
     return (SyncLane: Lane);
@@ -582,6 +590,7 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  //获取当前更新优先级,因为还没有进行相应的操作,所以当前优先级是NoLane 0
   const updateLane: Lane = (getCurrentUpdatePriority(): any);
   if (updateLane !== NoLane) {
     return updateLane;
@@ -593,7 +602,13 @@ export function requestUpdateLane(fiber: Fiber): Lane {
   // The opaque type returned by the host config is internally a lane, so we can
   // use that directly.
   // TODO: Move this type conversion to the event priority module.
+  /*
+      这里简单说一下getCurrentEventPriority作用:获取window.event,
+      如果是undefined那么返回DefaultEventPriority,反之拿着事件类型执行getEventPriority(),
+      getEventPriority内部就是switch判断给原生事件分个类然后返回React事件类型
+  */
   const eventLane: Lane = (getCurrentEventPriority(): any);
+  //这里返回的是DefaultEventPriority 16
   return eventLane;
 }
 
@@ -697,6 +712,7 @@ export function scheduleUpdateOnFiber(
 
 
     //workInProgressRoot:null
+    //此时还没有开启双缓存树
     if (root === workInProgressRoot) {
       // Received an update to a tree that's in the middle of rendering. Mark
       // that there was an interleaved update work on this root. Unless the
@@ -730,6 +746,7 @@ export function scheduleUpdateOnFiber(
 
     // 确保根被调度
     ensureRootIsScheduled(root, eventTime);
+    
     // 如果执行上下文为空, 会取消 schedule 调度
     if (
       lane === SyncLane &&

@@ -223,6 +223,7 @@ function legacyRenderSubtreeIntoContainer(
     warnOnInvalidCallback(callback === undefined ? null : callback, 'render');
   }
 
+  // 此时_reactRootContainer还不存在!!!
   const maybeRoot = container._reactRootContainer;
   let root: FiberRoot;
   // _reactRootContainer如果不存在
@@ -333,8 +334,7 @@ export function hydrate(
 
 
 export function render(
-  // 这里明确了传入的jsx就是React$Element,即<App>
-  element: React$Element<any>,
+  element: React$Element<any>,// 这里就是传入的jsx就是React$Element,即<App>
   container: Container,
   callback: ?Function,
 ) {
