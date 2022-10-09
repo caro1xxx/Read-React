@@ -1549,16 +1549,20 @@ function pushEffect(tag, create, destroy, deps) {
     // Circular
     next: (null: any),
   };
+  //这是一个循环链表
   let componentUpdateQueue: null | FunctionComponentUpdateQueue = (currentlyRenderingFiber.updateQueue: any);
+  // 如果是第一个effect
   if (componentUpdateQueue === null) {
     componentUpdateQueue = createFunctionComponentUpdateQueue();
     currentlyRenderingFiber.updateQueue = (componentUpdateQueue: any);
+    //向循环链表中推入当前effect
     componentUpdateQueue.lastEffect = effect.next = effect;
-  } else {
+  } else {//存在多个Effect
     const lastEffect = componentUpdateQueue.lastEffect;
     if (lastEffect === null) {
       componentUpdateQueue.lastEffect = effect.next = effect;
     } else {
+      //将当前effect加到循环链表末尾
       const firstEffect = lastEffect.next;
       lastEffect.next = effect;
       effect.next = firstEffect;
@@ -1660,6 +1664,7 @@ function updateRef<T>(initialValue: T): {|current: T|} {
 }
 
 function mountEffectImpl(fiberFlags, hookFlags, create, deps): void {
+  // 获取hook
   const hook = mountWorkInProgressHook();
   const nextDeps = deps === undefined ? null : deps;
   currentlyRenderingFiber.flags |= fiberFlags;
@@ -1676,11 +1681,13 @@ function updateEffectImpl(fiberFlags, hookFlags, create, deps): void {
   const nextDeps = deps === undefined ? null : deps;
   let destroy = undefined;
 
+  //没有Effect的情况流程和mountEffect一模一样
   if (currentHook !== null) {
     const prevEffect = currentHook.memoizedState;
     destroy = prevEffect.destroy;
     if (nextDeps !== null) {
       const prevDeps = prevEffect.deps;
+      // 注意：这里比较的deps使用Object.is比较依赖数组内的依赖
       if (areHookInputsEqual(nextDeps, prevDeps)) {
         hook.memoizedState = pushEffect(hookFlags, create, destroy, nextDeps);
         return;
@@ -1689,7 +1696,7 @@ function updateEffectImpl(fiberFlags, hookFlags, create, deps): void {
   }
 
   currentlyRenderingFiber.flags |= fiberFlags;
-
+  // 如果依赖项有变，会将HookHasEffect加入effect的tag中
   hook.memoizedState = pushEffect(
     HookHasEffect | hookFlags,
     create,

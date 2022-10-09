@@ -122,20 +122,29 @@ import {now} from './Scheduler';
 
 const {ReactCurrentDispatcher, ReactCurrentBatchConfig} = ReactSharedInternals;
 
-export type Update<S, A> = {|
-  lane: Lane,
-  action: A,
-  hasEagerState: boolean,
-  eagerState: S | null,
-  next: Update<S, A>,
-|};
 
+
+/**
+ * Update 和 UpdateQueue 是存储 useState 的 state 
+ * 及 useReducer 的 reducer 相关内容的数据结构
+ */
+export type Update<S, A> = {|
+  lane: Lane,// 优先级
+  action: A,// reducer 对应要执行的 action
+  hasEagerState: boolean,// 触发 dispatch 时的 reducer
+  eagerState: S | null,// 触发 dispatch 是的 state
+  next: Update<S, A>,// 下一个要执行的 Update
+|};
+/**
+ * Update 和 UpdateQueue 是存储 useState 的 state 
+ * 及 useReducer 的 reducer 相关内容的数据结构
+ */
 export type UpdateQueue<S, A> = {|
-  pending: Update<S, A> | null,
-  lanes: Lanes,
-  dispatch: (A => mixed) | null,
-  lastRenderedReducer: ((S, A) => S) | null,
-  lastRenderedState: S | null,
+  pending: Update<S, A> | null,// 当前要触发的 update
+  lanes: Lanes,// 车道组
+  dispatch: (A => mixed) | null,// 存放 dispatchAction.bind() 的值
+  lastRenderedReducer: ((S, A) => S) | null,// 上一次 render 的 reducer
+  lastRenderedState: S | null,// 上一次 render 的 state
 |};
 
 let didWarnAboutMismatchedHooksForComponent;
@@ -144,20 +153,23 @@ if (__DEV__) {
   didWarnAboutMismatchedHooksForComponent = new Set();
 }
 
+// 每一个 hooks 方法都会生成一个类型为 Hook 的对象，用来存储一些信息，
+// 函数组件 fiber 中的 memoizedState 会存储 hooks 链表，每个链表结点的结构就是 Hook。
 export type Hook = {|
-  memoizedState: any,
-  baseState: any,
-  baseQueue: Update<any, any> | null,
-  queue: any,
-  next: Hook | null,
+  memoizedState: any, // 上次渲染时所用的 state
+  baseState: any, // 已处理的 update 计算出的 state
+  baseQueue: Update<any, any> | null, // 未处理的 update 队列（一般是上一轮渲染未完成的 update）
+  queue: UpdateQueue<any, any> | null, // 当前触发的 update 队列
+  next: Hook | null, // 指向下一个 hook，形成链表结构
 |};
 
+// Effect 结构
 export type Effect = {|
-  tag: HookFlags,
-  create: () => (() => void) | void,
-  destroy: (() => void) | void,
-  deps: Array<mixed> | null,
-  next: Effect,
+  tag: HookFlags, // 标记是否有 effect 需要执行
+  create: () => (() => void) | void, // 回调函数
+  destroy: (() => void) | void, // 销毁时触发的回调
+  deps: Array<mixed> | null, // 依赖的数组
+  next: Effect, // 下一个要执行的 Effect
 |};
 
 type StoreInstance<T> = {|
@@ -379,19 +391,9 @@ export function renderWithHooks<Props, SecondArg>(
   nextRenderLanes: Lanes,
 ): any {
   renderLanes = nextRenderLanes;
+  // currentlyRenderingFiber 指向当前所执行的fiber
   currentlyRenderingFiber = workInProgress;
-
-  if (__DEV__) {
-    hookTypesDev =
-      current !== null
-        ? ((current._debugHookTypes: any): Array<HookType>)
-        : null;
-    hookTypesUpdateIndexDev = -1;
-    // Used for hot reloading:
-    ignorePreviousDependencies =
-      current !== null && current.type !== workInProgress.type;
-  }
-
+  // 置空 workInProgress fiber 中的 memoizedState 和 updateQueue
   workInProgress.memoizedState = null;
   workInProgress.updateQueue = null;
   workInProgress.lanes = NoLanes;
@@ -410,20 +412,6 @@ export function renderWithHooks<Props, SecondArg>(
   // Using memoizedState to differentiate between mount/update only works if at least one stateful hook is used.
   // Non-stateful hooks (e.g. context) don't get added to memoizedState,
   // so memoizedState would be null during updates and mounts.
-  if (__DEV__) {
-    if (current !== null && current.memoizedState !== null) {
-      ReactCurrentDispatcher.current = HooksDispatcherOnUpdateInDEV;
-    } else if (hookTypesDev !== null) {
-      // This dispatcher handles an edge case where a component is updating,
-      // but no stateful hooks have been used.
-      // We want to match the production code behavior (which will use HooksDispatcherOnMount),
-      // but with the extra DEV validation to ensure hooks ordering hasn't changed.
-      // This dispatcher does that.
-      ReactCurrentDispatcher.current = HooksDispatcherOnMountWithHookTypesInDEV;
-    } else {
-      ReactCurrentDispatcher.current = HooksDispatcherOnMountInDEV;
-    }
-  } else {
 
   //注意这里，当函数初次初始化时会调用onMount，如果非初次渲染会调用onUpdate
     ReactCurrentDispatcher.current =
@@ -435,13 +423,13 @@ export function renderWithHooks<Props, SecondArg>(
       // 这里则是调用useReduer更新hook.memoizedState
         : HooksDispatcherOnUpdate;
   }
-
+  // 执行函数组件的构造函数
   let children = Component(props, secondArg);
 
   // Check if there was a render phase update
   if (didScheduleRenderPhaseUpdateDuringThisPass) {
-    // Keep rendering in a loop for as long as render phase updates continue to
-    // be scheduled. Use a counter to prevent infinite loops.
+    // didScheduleRenderPhaseUpdateDuringThisPass 为 true 
+    // 说明发生了 re-render，会再次执行 render
     let numberOfReRenders: number = 0;
     do {
       didScheduleRenderPhaseUpdateDuringThisPass = false;
@@ -482,11 +470,11 @@ export function renderWithHooks<Props, SecondArg>(
 
   // We can assume the previous dispatcher is always this one, since we set it
   // at the beginning of the render phase and there's no re-entrance.
+
+  // 函数执行结束后，关闭 hooks 入口
   ReactCurrentDispatcher.current = ContextOnlyDispatcher;
 
-  if (__DEV__) {
-    workInProgress._debugHookTypes = hookTypesDev;
-  }
+  // 当前 fiber 的任务执行结束，重置全局变量
 
   // This check uses currentHook so that it works the same in DEV and prod bundles.
   // hookTypesDev could catch more cases (e.g. context) but only in DEV bundles.
@@ -1532,20 +1520,24 @@ function mountState<S>(
       next: null,
    */
   const hook = mountWorkInProgressHook();
+  // 校验初始的 state 是否是个函数，是的话执行该函数
   if (typeof initialState === 'function') {
     // $FlowFixMe: Flow doesn't like mixed types
     initialState = initialState();
   }
   // memoizedState = initialState 即直接初始化memoizedState为初始值
   hook.memoizedState = hook.baseState = initialState;
+  // 创建更新队列 updateQueue
   const queue: UpdateQueue<S, BasicStateAction<S>> = {
-    pending: null,
+    pending: null,// 待执行的 hook
     lanes: NoLanes,
-    dispatch: null,
-    lastRenderedReducer: basicStateReducer,
-    lastRenderedState: (initialState: any),
+    dispatch: null, // 更新函数
+    lastRenderedReducer: basicStateReducer,// 上次渲染的 reducer
+    lastRenderedState: (initialState: any),// 上次渲染的 state
   };
+  // 挂载
   hook.queue = queue;
+  // 创建 dispatch（负责更新的函数）
   const dispatch: Dispatch<
     BasicStateAction<S>,
   > = (queue.dispatch = (dispatchSetState.bind(
@@ -1553,6 +1545,7 @@ function mountState<S>(
     currentlyRenderingFiber,
     queue,
   ): any));
+  // 返回 useState 的 state 及 dispatch，供使用
   return [hook.memoizedState, dispatch];
 }
 
@@ -1576,6 +1569,7 @@ function rerenderState<S>(
 }
 
 function pushEffect(tag, create, destroy, deps) {
+  // 创建effect
   const effect: Effect = {
     tag,
     create,
@@ -1586,11 +1580,14 @@ function pushEffect(tag, create, destroy, deps) {
   };
   let componentUpdateQueue: null | FunctionComponentUpdateQueue = (currentlyRenderingFiber.updateQueue: any);
   if (componentUpdateQueue === null) {
+    // componentUpdateQueue 为 null，将 effect 添加到 componentUpdateQueue 首部
     componentUpdateQueue = createFunctionComponentUpdateQueue();
     currentlyRenderingFiber.updateQueue = (componentUpdateQueue: any);
     componentUpdateQueue.lastEffect = effect.next = effect;
   } else {
+    // 链接到当前 fiber 节点的 updateQueue 的 lastEffect 中
     const lastEffect = componentUpdateQueue.lastEffect;
+    // 构成循环链表结构
     if (lastEffect === null) {
       componentUpdateQueue.lastEffect = effect.next = effect;
     } else {
@@ -1621,6 +1618,7 @@ function getCallerStackFrame(): string {
 }
 
 function mountRef<T>(initialValue: T): {|current: T|} {
+  // 创建hook并添加到hook链表中
   const hook = mountWorkInProgressHook();
   if (enableUseRefAccessWarning) {
     if (__DEV__) {
@@ -1683,21 +1681,29 @@ function mountRef<T>(initialValue: T): {|current: T|} {
       return ref;
     }
   } else {
+    // 初始化ref对象
     const ref = {current: initialValue};
+    // 添加到memoizedState
     hook.memoizedState = ref;
     return ref;
   }
 }
 
 function updateRef<T>(initialValue: T): {|current: T|} {
+  // 获取hook
   const hook = updateWorkInProgressHook();
+  // 直接return了保存了之前hook的ref对象
   return hook.memoizedState;
 }
 
 function mountEffectImpl(fiberFlags, hookFlags, create, deps): void {
+  // 创建 hook 并链接到 hooks 链表中
   const hook = mountWorkInProgressHook();
+  // 获取上个依赖项
   const nextDeps = deps === undefined ? null : deps;
   currentlyRenderingFiber.flags |= fiberFlags;
+  // 创建一个 effect 对象并添加到 hook 的 memoizedState 中
+  // 就是往memoizedState内push
   hook.memoizedState = pushEffect(
     HookHasEffect | hookFlags,
     create,
@@ -1707,24 +1713,34 @@ function mountEffectImpl(fiberFlags, hookFlags, create, deps): void {
 }
 
 function updateEffectImpl(fiberFlags, hookFlags, create, deps): void {
+  // 获取hook
   const hook = updateWorkInProgressHook();
+  // 获取当前的依赖项
   const nextDeps = deps === undefined ? null : deps;
   let destroy = undefined;
-
+  //currentHook就是上一轮的hook
   if (currentHook !== null) {
+    // 若上一轮 render 对应 hook 存在
     const prevEffect = currentHook.memoizedState;
+    // 获取上个effect的销毁方法
     destroy = prevEffect.destroy;
+    // 如果当前依赖项存在
     if (nextDeps !== null) {
+      // 获取上一个依赖项
       const prevDeps = prevEffect.deps;
+      // areHookInputsEqual检测两个依赖项是否一致
       if (areHookInputsEqual(nextDeps, prevDeps)) {
+        // 若上一轮和本次的依赖项未发生变化，说明没有副作用
+        // 创建一个 effect 对象添加到 updateQueue 链表中，然后返回
         hook.memoizedState = pushEffect(hookFlags, create, destroy, nextDeps);
         return;
       }
     }
   }
-
+  // 执行到这里说明上一轮和本轮依赖项发生变化
+  // 向 fiber 添加 flags 副作用标签，待 commit 时更新
   currentlyRenderingFiber.flags |= fiberFlags;
-
+  // 创建一个 effect 对象添加到 updateQueue 链表中
   hook.memoizedState = pushEffect(
     HookHasEffect | hookFlags,
     create,
@@ -1902,25 +1918,40 @@ function mountDebugValue<T>(value: T, formatterFn: ?(value: T) => mixed): void {
 const updateDebugValue = mountDebugValue;
 
 function mountCallback<T>(callback: T, deps: Array<mixed> | void | null): T {
+  // 创建hook并添加到hook链表
   const hook = mountWorkInProgressHook();
+  // 获取本次dep
   const nextDeps = deps === undefined ? null : deps;
+  // 这里将参数callback和本次dep存入了memoizedState
   hook.memoizedState = [callback, nextDeps];
+  // 返回的是参数callback
   return callback;
 }
 
 function updateCallback<T>(callback: T, deps: Array<mixed> | void | null): T {
+  // 获取hook
   const hook = updateWorkInProgressHook();
+  // 获取本次dep
   const nextDeps = deps === undefined ? null : deps;
+  // 取出之前的值 即:[callback,dep]
   const prevState = hook.memoizedState;
+  // prevState如果存在
   if (prevState !== null) {
+    // nextDeps如果存在
     if (nextDeps !== null) {
+      // 初始化上一次依赖项为上一次结果的第二个元素 即dep
+      // 这里就是在获取上一次的dep
       const prevDeps: Array<mixed> | null = prevState[1];
+      // 判断是否相等,如果相等说明没有发生变化,即不更新
       if (areHookInputsEqual(nextDeps, prevDeps)) {
+        // 直接返回之前的结果 callback
         return prevState[0];
       }
     }
   }
+  // 反之发生了变化,将新的callback和nextDeps存入memoizedState
   hook.memoizedState = [callback, nextDeps];
+  // 返回
   return callback;
 }
 
@@ -1928,10 +1959,15 @@ function mountMemo<T>(
   nextCreate: () => T,
   deps: Array<mixed> | void | null,
 ): T {
+  // 创建hook并添加到hook链表
   const hook = mountWorkInProgressHook();
+  // 获取本次dep
   const nextDeps = deps === undefined ? null : deps;
+  // 执行参数nextCreate(),这个nextCreate就是我们传入的回调
   const nextValue = nextCreate();
+  // 将nextCreate结果和本次dep存入memoizedState
   hook.memoizedState = [nextValue, nextDeps];
+  // 返回nextCreate指向结果
   return nextValue;
 }
 
@@ -1939,20 +1975,30 @@ function updateMemo<T>(
   nextCreate: () => T,
   deps: Array<mixed> | void | null,
 ): T {
+  // 获取hook
   const hook = updateWorkInProgressHook();
+  // 获取本次dep
   const nextDeps = deps === undefined ? null : deps;
+  // 获取前一次的值 即[nextValue, nextDeps]
   const prevState = hook.memoizedState;
+  // 如果前一次值存在
   if (prevState !== null) {
-    // Assume these are defined. If they're not, areHookInputsEqual will warn.
+    //如果本次dep存在
     if (nextDeps !== null) {
+      // 获取前一次的dep
       const prevDeps: Array<mixed> | null = prevState[1];
+      // 判断前后两个dep是否相同
       if (areHookInputsEqual(nextDeps, prevDeps)) {
+        // 相同说明没有变化,复用前一次计算的值
         return prevState[0];
       }
     }
   }
+  // 反之发生了变化,执行参数nextCreate获取结果
   const nextValue = nextCreate();
+  // 存入
   hook.memoizedState = [nextValue, nextDeps];
+  // 返回 
   return nextValue;
 }
 
@@ -2452,17 +2498,26 @@ if (enableCache) {
   (ContextOnlyDispatcher: Dispatcher).useCacheRefresh = throwInvalidHookError;
 }
 
+
+/**
+ * 下列的函数就是hook,只不过在react执行时会进行判断,
+ * 如果是挂载那么就会执行mountXXX函数
+ */
 const HooksDispatcherOnMount: Dispatcher = {
   readContext,
 
+  // 初次useCallback
   useCallback: mountCallback,
   useContext: readContext,
+  // 初次挂载effect
   useEffect: mountEffect,
   useImperativeHandle: mountImperativeHandle,
   useLayoutEffect: mountLayoutEffect,
   useInsertionEffect: mountInsertionEffect,
+  // 初次useMemo
   useMemo: mountMemo,
   useReducer: mountReducer,
+  // 初次ref
   useRef: mountRef,
   //对于初次渲染，调用mount方法
   useState: mountState,
@@ -2480,17 +2535,26 @@ if (enableCache) {
   (HooksDispatcherOnMount: Dispatcher).getCacheForType = getCacheForType;
   (HooksDispatcherOnMount: Dispatcher).useCacheRefresh = mountRefresh;
 }
+
+/**
+ * 下列的函数就是hook,只不过在react执行时会进行判断,
+ * 如果是挂载那么就会执行updateXXX函数
+ */
 const HooksDispatcherOnUpdate: Dispatcher = {
   readContext,
 
+  // 更新useCallback
   useCallback: updateCallback,
   useContext: readContext,
+  // 更新effect调用updateEffect
   useEffect: updateEffect,
   useImperativeHandle: updateImperativeHandle,
   useInsertionEffect: updateInsertionEffect,
   useLayoutEffect: updateLayoutEffect,
+  // 更新memo
   useMemo: updateMemo,
   useReducer: updateReducer,
+  // 更新ref
   useRef: updateRef,
   //对于非初次渲染，调用update方法
   useState: updateState,

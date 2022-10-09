@@ -22,23 +22,6 @@ type BasicStateAction<S> = (S => S) | S;
 type Dispatch<A> = A => void;
 
 
-function resolveDispatcher() {
-  const dispatcher = ReactCurrentDispatcher.current;
-  // if (__DEV__) {
-  //   if (dispatcher === null) {
-  //     console.error(
-  //       'Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for' +
-  //         ' one of the following reasons:\n' +
-  //         '1. You might have mismatching versions of React and the renderer (such as React DOM)\n' +
-  //         '2. You might be breaking the Rules of Hooks\n' +
-  //         '3. You might have more than one copy of React in the same app\n' +
-  //         'See https://reactjs.org/link/invalid-hook-call for tips about how to debug and fix this problem.',
-  //     );
-  //   }
-  // }
-  return ((dispatcher: any): Dispatcher);
-}
-
 export function getCacheSignal(): AbortSignal {
   const dispatcher = resolveDispatcher();
   // $FlowFixMe This is unstable, thus optional
@@ -75,11 +58,28 @@ export function useContext<T>(Context: ReactContext<T>): T {
   return dispatcher.useContext(Context);
 }
 
+
+function resolveDispatcher() {
+  //因为所有hook都是挂载到resolveDispatcher上
+  //resolveDispatcher又挂载到了ReactCurrentDispatcher.current上
+
+  // ReactCurrentDispatcher的定义在HooksDispatcherOnMount和HooksDispatcherOnUpdate
+  const dispatcher = ReactCurrentDispatcher.current;
+  return ((dispatcher: any): Dispatcher);
+}
+
+/**
+ * 所有的 hooks api 都是挂载在 resolveDispatcher 
+ * 中返回的 dispatcher 对象上面的，
+ * 也就是挂载在 ReactCurrentDispatcher.current 上面
+ */
+
 // useState
 export function useState<S>(
   initialState: (() => S) | S,
 ): [S, Dispatch<BasicStateAction<S>>] {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useState(initialState);
 }
 
@@ -89,11 +89,13 @@ export function useReducer<S, I, A>(
   init?: I => S,
 ): [S, Dispatch<A>] {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useReducer(reducer, initialArg, init);
 }
 
 export function useRef<T>(initialValue: T): {|current: T|} {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useRef(initialValue);
 }
 
@@ -102,6 +104,7 @@ export function useEffect(
   deps: Array<mixed> | void | null,
 ): void {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useEffect(create, deps);
 }
 
@@ -110,6 +113,7 @@ export function useInsertionEffect(
   deps: Array<mixed> | void | null,
 ): void {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useInsertionEffect(create, deps);
 }
 
@@ -118,6 +122,7 @@ export function useLayoutEffect(
   deps: Array<mixed> | void | null,
 ): void {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useLayoutEffect(create, deps);
 }
 
@@ -126,6 +131,7 @@ export function useCallback<T>(
   deps: Array<mixed> | void | null,
 ): T {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useCallback(callback, deps);
 }
 
@@ -134,6 +140,7 @@ export function useMemo<T>(
   deps: Array<mixed> | void | null,
 ): T {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useMemo(create, deps);
 }
 
@@ -143,6 +150,7 @@ export function useImperativeHandle<T>(
   deps: Array<mixed> | void | null,
 ): void {
   const dispatcher = resolveDispatcher();
+  //挂载
   return dispatcher.useImperativeHandle(ref, create, deps);
 }
 
@@ -152,6 +160,7 @@ export function useDebugValue<T>(
 ): void {
   if (__DEV__) {
     const dispatcher = resolveDispatcher();
+    //挂载
     return dispatcher.useDebugValue(value, formatterFn);
   }
 }

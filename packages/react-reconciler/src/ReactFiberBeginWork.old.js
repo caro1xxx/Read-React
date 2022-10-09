@@ -1094,6 +1094,7 @@ function updateFunctionComponent(
   if (__DEV__) {
     ReactCurrentOwner.current = workInProgress;
     setIsRendering(true);
+    // 函数组件更新过程的执行入口renderWithHooks
     nextChildren = renderWithHooks(
       current,
       workInProgress,

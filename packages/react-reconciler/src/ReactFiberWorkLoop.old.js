@@ -975,7 +975,7 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
     throw new Error('Should not already be working.');
   }
 
-  // 在决定在哪个车道上工作之前，先冲掉任何未决的被动效果。
+  // 在决定在哪个车道上工作之前，先冲掉任何执行的被动效果。
   // 以防他们安排额外的工作
   const originalCallbackNode = root.callbackNode;
   // flushPassiveEffects()冲洗被动效果
@@ -1113,24 +1113,12 @@ function performConcurrentWorkOnRoot(root/*FiberRoot*/, didTimeout/*false*/) {
 }
 
 function recoverFromConcurrentError(root, errorRetryLanes) {
-  // If an error occurred during hydration, discard server response and fall
-  // back to client side render.
 
-  // Before rendering again, save the errors from the previous attempt.
+  // 保存上一次错误的原因
   const errorsFromFirstAttempt = workInProgressRootConcurrentErrors;
 
   if (isRootDehydrated(root)) {
-    // The shell failed to hydrate. Set a flag to force a client rendering
-    // during the next attempt. To do this, we call prepareFreshStack now
-    // to create the root work-in-progress fiber. This is a bit weird in terms
-    // of factoring, because it relies on renderRootSync not calling
-    // prepareFreshStack again in the call below, which happens because the
-    // root and lanes haven't changed.
-    //
-    // TODO: I think what we should do is set ForceClientRender inside
-    // throwException, like we do for nested Suspense boundaries. The reason
-    // it's here instead is so we can switch to the synchronous work loop, too.
-    // Something to consider for a future refactor.
+    // prepareFreshStack:准备双缓存
     const rootWorkInProgress = prepareFreshStack(root, errorRetryLanes);
     rootWorkInProgress.flags |= ForceClientRender;
     if (__DEV__) {
@@ -1138,17 +1126,16 @@ function recoverFromConcurrentError(root, errorRetryLanes) {
     }
   }
 
+  // 同步调和
   const exitStatus = renderRootSync(root, errorRetryLanes);
+  // 判断调和状态
   if (exitStatus !== RootErrored) {
     // Successfully finished rendering on retry
 
-    // The errors from the failed first attempt have been recovered. Add
-    // them to the collection of recoverable errors. We'll log them in the
-    // commit phase.
+    //第一次出现的错误被恢复了,现在将这次操作记录下来
     const errorsFromSecondAttempt = workInProgressRootRecoverableErrors;
     workInProgressRootRecoverableErrors = errorsFromFirstAttempt;
-    // The errors from the second attempt should be queued after the errors
-    // from the first attempt, to preserve the causal sequence.
+    // 保证两次调用的`因果关系`
     if (errorsFromSecondAttempt !== null) {
       queueRecoverableErrors(errorsFromSecondAttempt);
     }
@@ -1396,17 +1383,18 @@ function performSyncWorkOnRoot(root) {
 
   let exitStatus = renderRootSync(root, lanes);
   if (root.tag !== LegacyRoot && exitStatus === RootErrored) {
-    // If something threw an error, try rendering one more time. We'll render
-    // synchronously to block concurrent data mutations, and we'll includes
-    // all pending updates are included. If it still fails after the second
-    // attempt, we'll give up and commit the resulting tree.
+    // 如果第一次renderRootSync出错了,那么react将再尝试一次,最后如果还是失败了
+    // 那么将会抛弃这个节点
     const errorRetryLanes = getLanesToRetrySynchronouslyOnError(root);
+    // 判断第二次是否失败
     if (errorRetryLanes !== NoLanes) {
       lanes = errorRetryLanes;
+      // 如果失败,调用recoverFromConcurrentError
       exitStatus = recoverFromConcurrentError(root, errorRetryLanes);
     }
   }
 
+  // 出现致命错误的情况
   if (exitStatus === RootFatalErrored) {
     const fatalError = workInProgressRootFatalError;
     prepareFreshStack(root, NoLanes);
@@ -1415,12 +1403,13 @@ function performSyncWorkOnRoot(root) {
     throw fatalError;
   }
 
+  // 没有调和完成
   if (exitStatus === RootDidNotComplete) {
     throw new Error('Root did not complete. This is a bug in React.');
   }
 
-  // We now have a consistent tree. Because this is a sync render, we
-  // will commit it even if something suspended.
+  // 现在就得到了两颗一直的树
+  // 因为是同步渲染,不管有什么事情暂停,这里都会提交
   const finishedWork: Fiber = (root.current.alternate: any);
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
@@ -1431,8 +1420,7 @@ function performSyncWorkOnRoot(root) {
     workInProgressTransitions, /**null */
   );
 
-  // Before exiting, make sure there's a callback scheduled for the next
-  // pending level.
+  // 退出之前的回调
   ensureRootIsScheduled(root, now());
 
   return null;
@@ -2463,7 +2451,7 @@ function commitRootImpl(
      * 这是因为componentWillUnmount这个构造,绘制mutation时执行,可能会操作原来Fiber上的内容
      * **为了保证数据的可靠性不会修改current指向**
      * 
-     * 2而layout阶段会执行componentDidMount 和 componentDidUpdate钩子,此时需要获取到的 DOM 是更新后的
+     * 而layout阶段会执行componentDidMount 和 componentDidUpdate钩子,此时需要获取到的 DOM 是更新后的
      */
 
 
